@@ -117,6 +117,7 @@ textarea.field{min-height:116px;resize:vertical}
 .field.other{margin-top:10px}
 .flabel{display:block;margin:12px 0 6px;font:600 14px var(--f-body)}
 .reveal{animation:cin .4s ease both}
+.fhelp{margin:6px 0 0;min-height:1.2em;font:600 13px var(--f-body);color:#B3261E}
 .nslide{display:flex;flex-direction:column;align-items:center;padding:4px 2px 0}
 .n-big{display:flex;align-items:baseline;gap:8px;margin-bottom:8px}
 .n-big b{font:800 40px/1 var(--f-display);color:var(--coral-dk);font-variant-numeric:tabular-nums}
@@ -400,7 +401,7 @@ const Q = [
   { id: 'q17', ch: 5, kicker: 'The big one. Take your time.', q: 'What was the biggest problem you faced while planning the wedding?', type: 'long',
     placeholder: 'Tell us what happened…', key: 'Q24 Biggest problem' },
   { id: 'q18', ch: 5, kicker: 'Got 10 minutes some day?', q: 'Would you be open to a 10-minute call to tell us more?', type: 'call',
-    opts: ['Yes, happy to talk', 'No, thanks'], key: 'Q25 Open to a 10-minute call' }
+    opts: ['Yes, happy to help', 'No, thanks'], key: 'Q25 Open to a 10-minute call' }
 ];
 
 /* ================= drawing helpers ================= */
@@ -750,7 +751,7 @@ function sceneDayAfter() {
     </g>`);
   return art(
     `<path d="M-6 22 Q180 62 366 22" fill="none" stroke="${INK}" stroke-width="1.8"/>` +
-    pics.map(polaroid).join('') + hearts + album + ring);
+    pics.map(polaroid).join('') + hearts + album);
 }
 function reactDayAfter(root, a) { toggle(root, 'ring', /^Yes/.test(a.q18 || '')); }
 
@@ -1255,23 +1256,28 @@ function fillCall(q, box, el) {
   const form = document.createElement('div');
   form.innerHTML = `
     <label class="flabel" for="f-name">Your name</label><input class="field" id="f-name" autocomplete="name">
-    <label class="flabel" for="f-contact">Phone number or email</label><input class="field" id="f-contact" autocomplete="off">`;
+    <label class="flabel" for="f-contact">Phone number or email</label><input class="field" id="f-contact" autocomplete="off" placeholder="e.g. 98765 43210 or name@gmail.com">
+    <p class="fhelp" id="f-help" aria-live="polite"></p>`;
   box.appendChild(form);
-  const n = form.querySelector('#f-name'), c = form.querySelector('#f-contact');
+  const n = form.querySelector('#f-name'), c = form.querySelector('#f-contact'), help = form.querySelector('#f-help');
   n.value = S.answers.callName || '';
   c.value = S.answers.callContact || '';
-  n.addEventListener('input', () => { S.answers.callName = n.value.trim(); });
-  c.addEventListener('input', () => { S.answers.callContact = c.value.trim(); });
   const yes = () => /^Yes/.test(S.answers[q.id] || '');
+  const validContact = v => /^[^\s@]+@[^\s@]+\.[^\s@]{2,}$/.test(v) || v.replace(/\D/g, '').length >= 10;
+  const ok = () => answered(q) && (!yes() || (n.value.trim().length >= 2 && validContact(c.value.trim())));
   let next;
   const sync = () => {
     const show = yes();
     if (show && form.hidden) { form.hidden = false; form.classList.remove('reveal'); void form.offsetWidth; form.classList.add('reveal'); }
     form.hidden = !show;
-    if (next) next.disabled = !answered(q);
+    const cv = c.value.trim();
+    help.textContent = show && cv && !validContact(cv) ? 'Please enter a 10-digit phone number or a full email address.' : '';
+    if (next) next.disabled = !ok();
   };
-  choices(q, pick, 'grid', false, 'qtext', sync);
-  next = actions(el, 'Finish', () => { if (answered(q)) advance(); });
+  n.addEventListener('input', () => { S.answers.callName = n.value.trim(); sync(); });
+  c.addEventListener('input', () => { S.answers.callContact = c.value.trim(); sync(); });
+  choices(q, pick, 'grid', false, 'qtext', () => { sync(); if (yes()) setTimeout(() => n.focus(), 300); });
+  next = actions(el, 'Finish', () => { if (ok()) advance(); });
   form.hidden = !yes();
   sync();
 }
