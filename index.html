@@ -117,6 +117,17 @@ textarea.field{min-height:116px;resize:vertical}
 .field.other{margin-top:10px}
 .flabel{display:block;margin:12px 0 6px;font:600 14px var(--f-body)}
 .reveal{animation:cin .4s ease both}
+.nslide{display:flex;flex-direction:column;align-items:center;padding:4px 2px 0}
+.n-big{display:flex;align-items:baseline;gap:8px;margin-bottom:8px}
+.n-big b{font:800 40px/1 var(--f-display);color:var(--coral-dk);font-variant-numeric:tabular-nums}
+.n-big b.bump{animation:sel .3s ease}
+.n-big span{font:600 14px var(--f-body);color:var(--muted)}
+.nslide input[type=range]{-webkit-appearance:none;appearance:none;width:100%;height:12px;border-radius:99px;border:1.5px solid var(--ink);background:linear-gradient(90deg,var(--coral) 0 var(--p,50%),var(--hint) var(--p,50%));outline:none;cursor:pointer;touch-action:pan-y}
+.nslide:not(.has) input[type=range]{background:var(--hint)}
+.nslide input[type=range]::-webkit-slider-thumb{-webkit-appearance:none;width:30px;height:30px;border-radius:50%;background:var(--sun);border:2px solid var(--ink);box-shadow:0 3px 0 rgba(45,36,51,.2)}
+.nslide input[type=range]::-moz-range-thumb{width:28px;height:28px;border-radius:50%;background:var(--sun);border:2px solid var(--ink)}
+.nslide input[type=range]:focus-visible{box-shadow:0 0 0 4px rgba(255,122,89,.3)}
+.n-ends{display:flex;justify-content:space-between;width:100%;margin-top:6px;font:600 12px var(--f-body);color:var(--muted)}
 
 /* drag meter */
 .meter{display:flex;flex-direction:column;align-items:center}
@@ -292,7 +303,8 @@ const LIVE = !!(SUPABASE_URL && SUPABASE_KEY);
 /* ================= survey content ================= */
 const DIFF = ['Very easy', 'Easy', 'Neutral', 'Difficult', 'Very difficult'];
 const HAPPY = ['Very unhappy', 'Unhappy', 'Okay', 'Happy', 'Very happy'];
-const UPCOMING = 'I am getting married in the next few months';
+const UPCOMING = "It's coming up in the next few months";
+const COUPLE = a => a.q1 === 'Bride' || a.q1 === 'Groom';
 
 const CHAPTERS = [
   { title: 'About the wedding', bg: ['#FFE6D5', '#FFF6EE'], blobs: ['#FFC9A8', '#FFE29A', '#FFD1DC'], scene: sceneHome, react: reactHome },
@@ -307,17 +319,17 @@ const END_BG = { bg: ['#FFE3EC', '#FFF8F0'], blobs: ['#FFC6D3', '#FFE29A', '#C9F
 
 const Q = [
   /* 1. About the wedding */
-  { id: 'q1', ch: 0, kicker: "Let's begin.", q: 'Which of these describes you?', type: 'single', layout: 'list',
-    opts: ['I got married in the last 12 months', 'I got married 1 to 3 years ago', UPCOMING, 'None of these'], endOn: 'None of these',
-    key: 'Q1 Which describes you' },
-  { id: 'q2', ch: 0, kicker: a => a.q1 === UPCOMING ? 'Wedding still coming up? Answer based on your planning so far.' : 'And you are…',
-    q: 'Who are you answering as?', type: 'single', layout: 'grid',
-    opts: ['Bride', 'Groom', 'Parent of the bride or groom', 'Sibling or other relative'], key: 'Q2 Answering as' },
-  { id: 'q3', ch: 0, kicker: 'Watch the picture change as you answer.', q: 'Tell us a little about the wedding.', type: 'group', parts: [
-    { id: 'q3a', label: 'Which city is the wedding in?', type: 'text', placeholder: 'e.g. Hyderabad', optional: true, key: 'Q3 City' },
+  { id: 'q1', ch: 0, kicker: "Let's begin.", q: 'Who are you answering as?', type: 'single', layout: 'grid',
+    opts: ['Bride', 'Groom', 'Parent of the bride or groom', 'Sibling or other relative'], key: 'Q1 Answering as' },
+  { id: 'q2', ch: 0, kicker: a => COUPLE(a) ? 'Your big day.' : 'The wedding in your family.',
+    q: a => COUPLE(a) ? 'When did you get married, or when is your wedding?' : 'When was the wedding in your family, or when is it?', type: 'single', layout: 'list',
+    opts: [UPCOMING, 'In the last 12 months', '1 to 3 years ago', '3 to 5 years ago'],
+    key: 'Q2 When is or was the wedding' },
+  { id: 'q3', ch: 0, kicker: a => a.q2 === UPCOMING ? 'Wedding still coming up? Answer based on your planning so far.' : 'Watch the picture change as you answer.', q: 'Tell us a little about the wedding.', type: 'group', parts: [
+    { id: 'q3a', label: 'Which city is the wedding in?', type: 'text', placeholder: 'e.g. Hyderabad', key: 'Q3 City' },
     { id: 'q3b', label: 'Who mainly planned it?', type: 'single',
       opts: ['Our family, on our own', 'Family with a part-time or wedding-day coordinator', 'A full-service wedding planner'], key: 'Q4 Who planned the wedding' },
-    { id: 'q3c', label: 'Roughly, what was the total budget?', type: 'single', optional: true,
+    { id: 'q3c', label: 'Roughly, what was the total budget?', type: 'single',
       opts: ['Under ₹10 lakh', '₹10 to 25 lakh', '₹25 to 50 lakh', 'Above ₹50 lakh', 'Prefer not to say'], key: 'Q5 Budget' }
   ] },
 
@@ -332,8 +344,14 @@ const Q = [
       'Stitching had to be redone', 'Hard to match outfits for the family', 'Other'], key: 'Q8 What made shopping and tailoring hard' },
 
   /* 3. Finding vendors */
-  { id: 'q7', ch: 2, kicker: 'Photographer, caterer, decorator, mehendi…', q: 'Tell us about your vendors.', type: 'group', parts: [
-    { id: 'q7a', label: 'How many vendors did you book?', type: 'single', opts: ['1 to 5', '6 to 10', '11 to 15', 'More than 15', 'Not sure'], key: 'Q9 Vendors booked' },
+  { id: 'q7k', ch: 2, kicker: 'It takes a whole team to pull off a wedding.', q: 'Which of these did you book for the wedding?', type: 'multi', layout: 'chips',
+    opts: ['Venue or hall', 'Tent house (tent, chairs, lights)', 'Caterer or cook', 'Sweets or cake shop', 'Decorator', 'Florist', 'Photographer',
+      'Videographer or drone', 'Makeup artist', 'Mehendi artist', 'DJ or sound system', 'Band or live music', 'Dance choreographer', 'Anchor or emcee',
+      'Priest or officiant', 'Invitation cards and printing', 'Return gifts', 'Cars or transport', 'Hotel rooms for guests', 'Wedding planner or event manager',
+      'Jewellery', 'Outfits and tailoring', 'Other'],
+    key: 'Q9a Kinds of vendors booked' },
+  { id: 'q7', ch: 2, kicker: 'Watch the phone as you slide.', q: 'Tell us about your vendors.', type: 'group', parts: [
+    { id: 'q7a', label: 'How many vendors did you book in total?', type: 'number', min: 1, max: 15, key: 'Q9b Number of vendors booked (15 = 15 or more)' },
     { id: 'q7b', label: 'How did you find them?', type: 'multi',
       opts: ['Family or friends', 'Wedding websites or apps', 'Instagram', 'Google search', 'Suggested by the venue', 'Other'], key: 'Q10 How vendors were found' }
   ] },
@@ -463,8 +481,8 @@ function sceneHome() {
 }
 function reactHome(root, a) {
   const roles = { 'Bride': 'BRIDE', 'Groom': 'GROOM', 'Parent of the bride or groom': 'PARENT', 'Sibling or other relative': 'SIBLING' };
-  toggle(root, 'role', !!roles[a.q2]);
-  if (roles[a.q2]) setText(root, 'roleText2', roles[a.q2]);
+  toggle(root, 'role', !!roles[a.q1]);
+  if (roles[a.q1]) setText(root, 'roleText2', roles[a.q1]);
   const city = (a.q3a || '').trim();
   toggle(root, 'city', !!city);
   if (city) setText(root, 'cityText', city.length > 13 ? city.slice(0, 12) + '…' : city);
@@ -569,7 +587,7 @@ function scenePhone() {
     phone);
 }
 function reactPhone(root, a) {
-  const n = { '1 to 5': '5', '6 to 10': '10', '11 to 15': '15', 'More than 15': '20+', 'Not sure': '?' }[a.q7a] || '3';
+  const n = a.q7a ? (a.q7a >= 15 ? '15+' : String(a.q7a)) : '3';
   setText(root, 'badge', n);
   const ph = R(root, 'phone');
   if (ph) ph.classList.toggle('buzz', a.q8 >= 4);
@@ -695,26 +713,44 @@ function reactFamily(root, a) {
 
 /* ---------- 6. looking back: the morning after ---------- */
 function sceneDayAfter() {
-  const chair = oy => `
-    <rect x="9" y="${oy + 72}" width="8" height="74" rx="3" fill="#F2785A" ${st(2.5)}/>
-    <rect x="67" y="${oy + 72}" width="8" height="74" rx="3" fill="#F2785A" ${st(2.5)}/>
-    <rect x="4" y="${oy}" width="76" height="62" rx="12" fill="#FF8A6B" ${st()}/>
-    <rect x="16" y="${oy + 14}" width="52" height="7" rx="3.5" fill="#E0603F"/>
-    <rect x="16" y="${oy + 28}" width="52" height="7" rx="3.5" fill="#E0603F"/>
-    <rect x="16" y="${oy + 42}" width="52" height="7" rx="3.5" fill="#E0603F"/>
-    <rect x="0" y="${oy + 60}" width="84" height="13" rx="5" fill="#FF9F85" ${st()}/>`;
-  const ring = at(312, 112, sticker('ring', `<rect x="-14" y="-24" width="28" height="48" rx="7" fill="${INK}"/><rect x="-10" y="-17" width="20" height="32" rx="3" fill="#9BE0C1"/>
+  const pics = [
+    [46, 31.6, '#FFD1DC', 'flowers', `<path d="M-9 30 L0 52 L9 30 Z" fill="#9BE0C1" ${st(1.4)}/><path d="M-4 30 L0 22 M4 30 L0 22 M0 30 L0 20" stroke="#4E8A34" stroke-width="1.6"/><circle cx="-7" cy="22" r="6" fill="#FF8FB1" ${st(1.3)}/><circle cx="7" cy="22" r="6" fill="#FFD95A" ${st(1.3)}/><circle cx="0" cy="16" r="6" fill="#FF9F43" ${st(1.3)}/>`],
+    [135, 40.8, '#CDEBFA', 'rings', `<circle cx="-6" cy="34" r="11" fill="none" stroke="#E0A82E" stroke-width="5"/><circle cx="7" cy="34" r="11" fill="none" stroke="#F2C14E" stroke-width="5"/><path d="M-6 21 l3 -6 l3 6" fill="#9BE0C1" ${st(1.2)}/>`],
+    [225, 40.8, '#FFE9B0', 'food', `<ellipse cx="0" cy="49" rx="20" ry="4" fill="#FFD27A" ${st(1.6)}/>` + [[-10, 42], [0, 42], [10, 42], [-5, 33], [5, 33], [0, 24]].map(([x, y]) => `<circle cx="${x}" cy="${y}" r="5.4" fill="#FFB547" ${st(1.4)}/>`).join('')],
+    [314, 31.6, '#D7F2E4', 'photos', `<rect x="-17" y="24" width="34" height="23" rx="5" fill="${INK}"/><rect x="-7" y="19" width="12" height="7" rx="2" fill="${INK}"/><circle cx="0" cy="35.5" r="7.5" fill="#A9DCF7" stroke="#fff" stroke-width="2"/><circle cx="11" cy="29" r="2" fill="#FFD95A"/>`]
+  ];
+  const polaroid = ([x, y, bg, cap, pic], k) => `<g class="swing" style="transform-origin:${x}px ${y}px;animation-delay:-${k * 0.9}s">${at(x, y, pop(0.15 + k * 0.15, `
+    <rect x="-32" y="4" width="64" height="78" rx="4" fill="#fff" ${st(2.5)}/>
+    <rect x="-27" y="9" width="54" height="50" rx="2" fill="${bg}"/>
+    <g>${pic}</g>
+    <text class="tk" x="0" y="75" text-anchor="middle" font-size="12" fill="${INK}">${cap}</text>
+    <rect x="-5" y="-3" width="10" height="12" rx="2" fill="#FF8FB1" ${st(1.6)}/>`))}</g>`;
+  const ring = at(54, 200, sticker('ring', `<rect x="-14" y="-24" width="28" height="48" rx="7" fill="${INK}"/><rect x="-10" y="-17" width="20" height="32" rx="3" fill="#9BE0C1"/>
     <path d="M20 -16 q8 8 0 16 M26 -22 q13 14 0 28 M-20 -16 q-8 8 0 16 M-26 -22 q-13 14 0 28" fill="none" stroke="${INK}" stroke-width="2.4" stroke-linecap="round"/>`), -10);
+  let hearts = '';
+  [[100, 172, '#FF8FB1'], [262, 168, '#CDBDF5'], [118, 226, '#FF7A59']].forEach(([x, y, c], k) => {
+    hearts += `<path class="tw" style="animation-delay:${k * 0.4}s" d="M${x} ${y + 7} C${x - 7} ${y} ${x - 9} ${y - 5} ${x - 4.5} ${y - 8} C${x - 2} ${y - 10} ${x} ${y - 7} ${x} ${y - 5} C${x} ${y - 7} ${x + 2} ${y - 10} ${x + 4.5} ${y - 8} C${x + 9} ${y - 5} ${x + 7} ${y} ${x} ${y + 7} Z" fill="${c}" ${st(1.6)}/>`;
+  });
+  const album = pop(0.75, `
+    <g transform="translate(180 146)">
+      <rect x="-50" y="0" width="100" height="106" rx="9" fill="#C99A6B" ${st()}/>
+      <rect x="-42" y="10" width="84" height="90" rx="4" fill="#fff" ${st(2)}/>
+      <rect x="-18" y="-6" width="36" height="14" rx="5" fill="#B9B0C9" ${st(2.5)}/>
+      <text class="tb" x="0" y="27" text-anchor="middle" font-size="11" fill="${INK}" letter-spacing="1">PLANNING</text>
+      <path d="M-36 40 l4 4 l8 -9" fill="none" stroke="#22774B" stroke-width="3" stroke-linecap="round" stroke-linejoin="round"/><path d="M-18 40 H32" stroke="#E4DCD3" stroke-width="3" stroke-linecap="round"/>
+      <path d="M-36 56 l4 4 l8 -9" fill="none" stroke="#22774B" stroke-width="3" stroke-linecap="round" stroke-linejoin="round"/><path d="M-18 56 H26" stroke="#E4DCD3" stroke-width="3" stroke-linecap="round"/>
+      <path d="M-36 66 l8 8 M-28 66 l-8 8" stroke="#E0453A" stroke-width="3" stroke-linecap="round"/><path d="M-18 72 H30" stroke="#E4DCD3" stroke-width="3" stroke-linecap="round"/>
+      <path d="M-36 88 l4 4 l8 -9" fill="none" stroke="#22774B" stroke-width="3" stroke-linecap="round" stroke-linejoin="round"/><path d="M-18 88 H20" stroke="#E4DCD3" stroke-width="3" stroke-linecap="round"/>
+    </g>
+    <g transform="translate(300 206)">
+      <rect x="-24" y="0" width="48" height="44" rx="4" fill="#CDBDF5" ${st()}/>
+      <rect x="-28" y="-12" width="56" height="14" rx="3" fill="#B9A4F0" ${st()}/>
+      <path d="M0 -12 V44" stroke="#FF7A59" stroke-width="6"/>
+      <path d="M0 -12 C-6 -26 -20 -22 -12 -14 Z M0 -12 C6 -26 20 -22 12 -14 Z" fill="#FF7A59" ${st(2)}/>
+    </g>`);
   return art(
-    `<g class="rise"><circle cx="196" cy="214" r="74" fill="#FFD27A" opacity=".85"/><circle cx="196" cy="214" r="98" fill="#FFD27A" opacity=".25"/></g>` +
-    lights(-6, 16, 366, 30, 28, 18, 3) +
-    at(26, 74, pop(0.05, chair(30) + chair(20) + chair(10) + chair(0))) +
-    at(148, 172, pop(0.3, `
-      <rect x="0" y="0" width="106" height="76" rx="6" fill="#9A86D6" ${st()}/>
-      <rect x="7" y="7" width="92" height="62" rx="4" fill="none" stroke="#FFE29A" stroke-width="2"/>
-      <text class="tk" x="53" y="38" text-anchor="middle" font-size="15" fill="#FFE29A">Our Wedding</text>
-      <path d="M53 58 C48 53 44 50 47 46 C49 43 52 44 53 46.5 C54 44 57 43 59 46 C62 50 58 53 53 58 Z" fill="#FFE29A"/>`)) +
-    kulhad(300, 0.5) + ring);
+    `<path d="M-6 22 Q180 62 366 22" fill="none" stroke="${INK}" stroke-width="1.8"/>` +
+    pics.map(polaroid).join('') + hearts + album + ring);
 }
 function reactDayAfter(root, a) { toggle(root, 'ring', /^Yes/.test(a.q18 || '')); }
 
@@ -862,7 +898,7 @@ function buildStart() {
     <p class="eyebrow">A 4-minute survey</p>
     <h1 class="title" tabindex="-1">Behind the <span>Shaadi</span></h1>
     <p class="body">We are students at IIIT Hyderabad researching how families in India plan weddings: shopping, finding vendors, paying them and making decisions together.</p>
-    <p class="body small">For anyone who got married in the last three years, or is getting married in the next few months. Your answers stay anonymous and are used only for our course project.</p>
+    <p class="body small">For brides, grooms and families who have planned a wedding, or are planning one now. Your answers stay anonymous and are used only for our course project.</p>
     <ul class="tags"><li>About 4 minutes</li><li>Anonymous</li></ul>
     <div class="actions"><button class="next big" id="startBtn" type="button">Let's start <span class="arr" aria-hidden="true">→</span></button></div>`;
   el.querySelector('#startBtn').addEventListener('click', e => { burst(e, e.currentTarget, 14); beginStory(); });
@@ -927,7 +963,7 @@ function buildQ(q) {
   const el = document.createElement('div');
   el.innerHTML = `
     <p class="kicker">${esc(kicker)}</p>
-    <h2 class="q" id="qtext" tabindex="-1">${esc(q.q)}</h2>
+    <h2 class="q" id="qtext" tabindex="-1">${esc(typeof q.q === 'function' ? q.q(S.answers) : q.q)}</h2>
     ${q.type === 'multi' ? '<p class="sub">Pick all that apply.</p>' : ''}
     <div class="answers"></div>
     <div class="foot"><button class="back" type="button">← Back</button><span class="hint">${HINT[q.type]}</span></div>`;
@@ -1075,6 +1111,28 @@ function meter(spec, mount, labelId, onSet) {
   paint(cur);
 }
 
+/* ---------- number slider: how many vendors ---------- */
+function numSlider(spec, mount, labelId, onSet) {
+  mount.classList.add('nslide');
+  const v0 = S.answers[spec.id];
+  mount.innerHTML = `<div class="n-big" aria-hidden="true"><b></b><span></span></div>
+    <input type="range" min="${spec.min}" max="${spec.max}" step="1" value="${v0 || Math.round((spec.min + spec.max) / 2)}" aria-labelledby="${labelId}">
+    <div class="n-ends"><span>${spec.min}</span><span>${Math.round((spec.min + spec.max) / 2)}</span><span>${spec.max}+</span></div>`;
+  const r = mount.querySelector('input'), big = mount.querySelector('.n-big b'), sub = mount.querySelector('.n-big span');
+  const paint = (v, set) => {
+    const pct = (v - spec.min) / (spec.max - spec.min) * 100;
+    r.style.setProperty('--p', pct + '%');
+    mount.classList.toggle('has', !!set);
+    big.textContent = set ? (v >= spec.max ? spec.max + '+' : v) : '?';
+    sub.textContent = set ? (v === 1 ? 'vendor' : 'vendors') : 'Slide to choose';
+    r.setAttribute('aria-valuetext', set ? (v >= spec.max ? spec.max + ' or more vendors' : v + ' vendors') : 'Not answered');
+  };
+  paint(+r.value, v0 != null);
+  const set = () => { const v = +r.value; S.answers[spec.id] = v; paint(v, true); big.classList.remove('bump'); void big.offsetWidth; big.classList.add('bump'); reactNow(); onSet(v); };
+  r.addEventListener('input', set);
+  r.addEventListener('change', e => { burst(e, big, 6); });
+}
+
 function fillSingle(q, box) {
   choices(q, box, q.layout, false, 'qtext', () => { busy = true; setTimeout(advance, reduce ? 120 : 430); });
 }
@@ -1174,6 +1232,7 @@ function fillGroup(q, box, el, isLast) {
     };
     if (p.type === 'single' || p.type === 'multi') choices(p, body, 'chips', p.type === 'multi', 'pl-' + p.id, after);
     else if (p.type === 'scale') meter(p, body, 'pl-' + p.id, after);
+    else if (p.type === 'number') numSlider(p, body, 'pl-' + p.id, after);
     else if (p.type === 'text') {
       const f = document.createElement('input');
       f.className = 'field';
@@ -1320,8 +1379,8 @@ function screenOut() {
     el.innerHTML = `
       <p class="kicker">No problem at all.</p>
       <h2 class="q" tabindex="-1">Thanks for stopping by!</h2>
-      <p class="body">This survey is only for people who got married in the last three years or are getting married in the next few months.</p>
-      <p class="body small">Know someone who fits? Please send this to them.</p>
+      <p class="body">This survey is only about weddings from the last three years, or ones coming up in the next few months.</p>
+      <p class="body small">Know someone who had a wedding recently? Please send this to them.</p>
       <div class="actions">${LIVE ? '<button class="next" id="copyBtn" type="button">Copy survey link</button>' : ''}<button class="skip" id="oops" type="button">I picked the wrong option</button></div>
       <input class="field" id="linkField" readonly hidden aria-label="Survey link">`;
     el.querySelector('#oops').addEventListener('click', back);
