@@ -1,0 +1,1357 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
+<!-- Behind the Shaadi: wedding-planning survey. Answers are saved to Supabase. Results: dashboard.html -->
+<title>Behind the Shaadi</title>
+<meta name="claude:viewport-fit-sides" content="cover">
+<meta name="description" content="A 4-minute survey about planning a wedding in India.">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Baloo+2:wght@600;700;800&family=Kalam:wght@400;700&family=Mukta:wght@400;500;600;700&display=swap">
+<style>
+/* Layout: one screen. Soft pastel backdrop that changes per chapter, a drawing on top that reacts
+   to each answer, and a white question card below. Centred column, max 480px. */
+:root{
+  --ink:#2D2433;        /* text, outlines */
+  --muted:#6C6274;
+  --paper:#FFFFFF;      /* cards */
+  --sun:#FFD95A;        /* selected answers */
+  --coral:#FF7A59;      /* progress, accents */
+  --coral-dk:#C24A2C;   /* coral text on white */
+  --mint:#9BE0C1;
+  --lilac:#CDBDF5;
+  --hint:#F3EEE8;
+  --f-display:"Baloo 2","Trebuchet MS",system-ui,sans-serif;
+  --f-body:"Mukta","Segoe UI",system-ui,sans-serif;
+  --f-hand:"Kalam","Segoe Print","Comic Sans MS",cursive;
+  color-scheme:light;
+}
+[hidden]{display:none!important}
+html{height:100%;box-sizing:border-box;background:#FFF6EE;
+  padding-top:env(safe-area-inset-top,0px);padding-bottom:env(safe-area-inset-bottom,0px)}
+*,*::before,*::after{box-sizing:inherit}
+body{height:100%;margin:0;background:#FFF6EE;color:var(--ink);font-family:var(--f-body);overflow:hidden;-webkit-tap-highlight-color:transparent}
+button{font:inherit;color:inherit}
+:focus-visible{outline:3px solid var(--coral);outline-offset:2px}
+
+/* ---------- backdrop ---------- */
+.bgs{position:fixed;inset:0;z-index:0;pointer-events:none;overflow:hidden}
+.bg{position:absolute;inset:0;opacity:0;transition:opacity 1.1s ease}
+.bg.on{opacity:1}
+.blob{position:absolute;border-radius:50%;width:70vmax;height:70vmax;animation:drift 18s ease-in-out infinite alternate}
+.blob.b1{left:-30vmax;top:-30vmax}
+.blob.b2{right:-34vmax;top:18vh;animation-duration:22s;animation-delay:-6s}
+.blob.b3{left:-20vmax;bottom:-40vmax;animation-duration:26s;animation-delay:-12s}
+.fall{position:absolute;inset:0;opacity:0;transition:opacity 1s}
+.fall.on{opacity:1}
+.fall i{position:absolute;top:-14px;width:8px;height:12px;border-radius:2px;animation:fall linear infinite}
+
+/* ---------- frame ---------- */
+.app{position:relative;z-index:2;height:100%;max-width:480px;margin:0 auto;display:flex;flex-direction:column;
+  padding-left:max(16px,env(safe-area-inset-left,0px));padding-right:max(16px,env(safe-area-inset-right,0px));padding-block:14px}
+.top{flex:0 0 auto;display:flex;flex-direction:column;gap:8px;transition:opacity .4s}
+.app[data-mode="start"] .top,.app[data-mode="end"] .top{display:none}
+.toprow{display:flex;justify-content:space-between;align-items:baseline;gap:12px;font:700 13.5px/1.2 var(--f-body)}
+.pc{min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.pc b{color:var(--coral-dk)}
+.pt{flex:0 0 auto;color:var(--muted);font-weight:600}
+.segs{display:grid;grid-template-columns:repeat(6,1fr);gap:5px}
+.segs i{height:7px;border-radius:99px;background:rgba(45,36,51,.1);overflow:hidden}
+.segs b{display:block;height:100%;width:0;border-radius:inherit;background:var(--coral);transition:width .6s cubic-bezier(.2,.8,.2,1)}
+
+.scene{position:relative;flex:1 1 auto;min-height:100px}
+.art-wrap{position:absolute;inset:0}
+.art-wrap.in{animation:artin .6s ease both}
+.art-wrap.out{animation:artout .35s ease forwards}
+.art{position:absolute;inset:0;width:100%;height:100%;overflow:visible}
+.art .tb{font-family:var(--f-display);font-weight:800}
+.art .tk{font-family:var(--f-hand);font-weight:700}
+.art .tm{font-family:var(--f-body);font-weight:600}
+
+/* ---------- card ---------- */
+.card{position:relative;flex:0 0 auto;max-height:min(76%,640px);overflow:auto;overscroll-behavior:contain;margin-top:8px;
+  background:var(--paper);border:1.5px solid var(--ink);border-radius:24px;padding:16px 16px 12px;
+  box-shadow:0 14px 34px rgba(45,36,51,.12);scrollbar-width:thin}
+.cin{animation:cin .42s cubic-bezier(.2,.9,.3,1.1) both}
+.cin.from-top{animation-name:cintop}
+.cin.out{animation:cout .15s ease forwards}
+.kicker{margin:0 0 3px;font:600 14.5px/1.3 var(--f-body);color:var(--coral-dk)}
+.q{margin:0 0 12px;font:800 21px/1.18 var(--f-display);text-wrap:balance}
+.q:focus,.title:focus{outline:none}
+.sub{margin:-7px 0 10px;font:500 13.5px/1.3 var(--f-body);color:var(--muted)}
+
+.answers{display:grid;gap:10px}
+.answers.grid{grid-template-columns:1fr 1fr}
+.answers.grid>.opt:last-child:nth-child(odd){grid-column:1/-1}
+.opt{appearance:none;display:flex;align-items:center;gap:10px;width:100%;min-height:48px;text-align:left;font:600 15.5px/1.25 var(--f-body);
+  color:var(--ink);background:#fff;border:1.5px solid var(--ink);border-radius:14px;padding:9px 12px;box-shadow:0 3px 0 rgba(45,36,51,.16);
+  cursor:pointer;transition:background .2s,transform .1s,box-shadow .1s}
+.opt:hover{background:#FFFAEB}
+.opt:active{transform:translateY(2px);box-shadow:0 1px 0 rgba(45,36,51,.16)}
+.opt.sel,.chip.sel{background:var(--sun);animation:sel .35s ease}
+.mark{flex:0 0 auto;width:20px;height:20px;border:1.5px solid var(--ink);border-radius:50%;background:#fff;display:grid;place-items:center}
+.opt.multi .mark{border-radius:6px}
+.opt.sel .mark{background:var(--ink)}
+.opt.sel .mark::after{content:"";width:7px;height:7px;border-radius:50%;background:var(--sun)}
+.opt.multi.sel .mark::after{width:5px;height:9px;border-radius:0;background:none;border:solid var(--sun);border-width:0 2.5px 2.5px 0;transform:translate(0,-1px) rotate(45deg)}
+.chips,.answers.chips{display:flex;flex-wrap:wrap;gap:8px}
+.chip{appearance:none;font:600 14.5px/1.25 var(--f-body);color:var(--ink);background:#fff;border:1.5px solid var(--ink);border-radius:999px;
+  padding:8px 14px 7px;text-align:left;cursor:pointer;box-shadow:0 2px 0 rgba(45,36,51,.14);transition:background .2s,transform .1s}
+.chip:hover{background:#FFFAEB}
+.chip:active{transform:translateY(1px)}
+.opt.sel:hover,.chip.sel:hover{background:var(--sun)}
+.chip.multi.sel::before{content:"✓";margin-right:6px;font-weight:800}
+.answers.parts{display:flex;flex-direction:column;gap:0}
+.part{padding:12px 0;border-top:1.5px dashed #E4DCD3}
+.part:first-child{border-top:none;padding-top:0}
+.plabel{margin:0 0 9px;font:700 15px/1.3 var(--f-body)}
+.plabel small{font-weight:500;color:var(--muted)}
+.plabel .tick{display:inline-grid;place-items:center;width:18px;height:18px;margin-left:6px;border-radius:50%;background:var(--mint);font-size:11px;vertical-align:1px;opacity:0;transform:scale(.3);transition:.3s cubic-bezier(.2,1.6,.4,1)}
+.part.done .tick{opacity:1;transform:none}
+.field{display:block;width:100%;font:500 16px/1.4 var(--f-body);color:var(--ink);background:#fff;border:1.5px solid var(--ink);border-radius:14px;padding:11px 14px;outline:none;transition:box-shadow .2s}
+.field:focus{box-shadow:0 0 0 4px rgba(255,122,89,.25)}
+.field::placeholder{color:#A39AA8}
+textarea.field{min-height:116px;resize:vertical}
+.field.other{margin-top:10px}
+.flabel{display:block;margin:12px 0 6px;font:600 14px var(--f-body)}
+.reveal{animation:cin .4s ease both}
+
+/* drag meter */
+.meter{display:flex;flex-direction:column;align-items:center}
+.m-pic{width:84px;height:84px}
+.m-pic svg{width:100%;height:100%;overflow:visible}
+.m-word{margin:2px 0 6px;min-height:1.4em;font:800 17px/1.3 var(--f-display);color:var(--coral-dk)}
+.m-track{position:relative;width:100%;padding:14px 0 2px;touch-action:pan-y;cursor:pointer;outline:none;border-radius:12px}
+.m-track:focus-visible{box-shadow:0 0 0 3px rgba(255,122,89,.35)}
+.m-rail{position:absolute;left:10%;right:10%;top:20px;height:10px;border-radius:99px;background:var(--hint);border:1.5px solid var(--ink)}
+.m-fill{display:block;height:100%;width:0;border-radius:inherit;background:var(--coral);transition:width .25s}
+.meter.dragging .m-fill{transition:none}
+.m-thumb{position:absolute;top:11px;left:50%;width:28px;height:28px;margin-left:-14px;border-radius:50%;background:#fff;border:2px solid var(--ink);
+  box-shadow:0 3px 0 rgba(45,36,51,.2);transition:left .25s cubic-bezier(.2,1.3,.4,1),transform .2s;opacity:.45}
+.meter.has .m-thumb{opacity:1;background:var(--sun)}
+.meter.dragging .m-thumb{transition:transform .2s;transform:scale(1.18)}
+.m-stops{position:relative;display:grid;grid-template-columns:repeat(5,1fr);margin-top:24px}
+.m-stop{display:flex;flex-direction:column;align-items:center;gap:3px;font:600 11.5px/1.15 var(--f-body);color:var(--muted);text-align:center}
+.m-stop i{width:6px;height:6px;border-radius:50%;background:#CFC6D6}
+.m-stop.on{color:var(--ink)}
+.m-stop.on i{background:var(--ink)}
+.bigchilli .c-g{transform-box:fill-box;transform-origin:50% 50%;transition:transform .3s cubic-bezier(.2,1.4,.4,1)}
+.bigchilli .c-body{transition:fill .3s}
+.bigchilli .c-steam{transition:opacity .3s}
+.bigchilli.hot .c-g{animation:jit .18s linear infinite}
+.face .f-cheek,.face .f-tear{transition:opacity .3s}
+
+/* quick-round deck */
+.deck{position:relative;height:104px;margin:2px 4px 14px}
+.dk{position:absolute;left:0;right:0;top:0;height:96px;border:1.5px solid var(--ink);border-radius:18px;background:#fff;transition:opacity .3s}
+.dk.d2{transform:translateY(6px) scale(.96);background:#FFF1E8}
+.dk.d3{transform:translateY(12px) scale(.92);background:#FFE6D8}
+.dk.d1{z-index:2;display:flex;flex-direction:column;justify-content:center;align-items:center;padding:8px 16px;text-align:center;box-shadow:0 6px 16px rgba(45,36,51,.1)}
+.dnum{font:700 11.5px var(--f-body);letter-spacing:.08em;text-transform:uppercase;color:var(--muted)}
+.ditem{margin:4px 0 0;font:800 18px/1.2 var(--f-display);text-wrap:balance}
+.d1.fly-l{animation:flyl .38s ease-in forwards}
+.d1.fly-r{animation:flyr .38s ease-in forwards}
+.d1.fly-u{animation:flyu .38s ease-in forwards}
+.d1.deal{animation:deal .35s cubic-bezier(.2,1.2,.4,1)}
+.scale{display:grid;grid-template-columns:repeat(5,1fr);gap:7px}
+.pip{display:flex;flex-direction:column;align-items:center;gap:3px;min-width:0;min-height:78px;background:#fff;border:1.5px solid var(--ink);border-radius:14px;
+  padding:7px 2px 6px;cursor:pointer;box-shadow:0 3px 0 rgba(45,36,51,.16);transition:background .2s,transform .1s}
+.pip:active{transform:translateY(2px)}
+.pip.lit{background:#FFF3E2}
+.pip.on{background:var(--sun)}
+.pip .ico{width:32px;height:32px}
+.pl{font:600 10.5px/1.15 var(--f-body);text-align:center;overflow-wrap:break-word}
+.chilli .body{fill:#EEE7E1;transition:fill .25s}
+.pip.lit .chilli .body{fill:#F0453A}
+
+.actions{display:flex;align-items:center;gap:14px;flex-wrap:wrap;margin-top:14px}
+.next{font:800 16px/1 var(--f-display);color:#fff;background:var(--ink);border:none;border-radius:999px;padding:13px 24px 11px;
+  box-shadow:0 4px 0 var(--coral);cursor:pointer;transition:transform .1s,box-shadow .1s,opacity .2s}
+.next:active{transform:translateY(3px);box-shadow:0 1px 0 var(--coral)}
+.next:disabled{opacity:.3;cursor:not-allowed}
+.next.big{font-size:18px;padding:15px 28px 13px}
+.next .arr{display:inline-block;margin-left:6px;animation:nudge 1.4s ease-in-out infinite}
+.skip{font:600 14px var(--f-body);background:none;border:none;color:var(--muted);text-decoration:underline;text-underline-offset:3px;cursor:pointer;padding:8px 2px}
+.foot{display:flex;justify-content:space-between;align-items:center;gap:10px;margin-top:12px}
+.back{font:600 13.5px var(--f-body);background:none;border:none;color:var(--muted);cursor:pointer;padding:4px 0}
+.back:hover{color:var(--ink)}
+.hint{font:600 12.5px/1.2 var(--f-body);color:var(--muted);text-align:right;margin-left:auto}
+
+/* start + end */
+.eyebrow{margin:0;font:700 11.5px/1.3 var(--f-body);letter-spacing:.12em;text-transform:uppercase;color:var(--coral-dk)}
+.title{margin:4px 0 10px;font:800 36px/1 var(--f-display);text-wrap:balance}
+.title span{color:var(--coral)}
+.body{margin:0 0 8px;font:400 15.5px/1.5 var(--f-body);max-width:60ch}
+.body.small{font-size:14px;color:var(--muted)}
+.tags{list-style:none;display:flex;flex-wrap:wrap;gap:6px;padding:0;margin:10px 0 2px}
+.tags li{font:600 12.5px/1.4 var(--f-body);border-radius:999px;padding:3px 11px 2px}
+.tags li:nth-child(1){background:#FFE29A}.tags li:nth-child(2){background:#C9F0DD}.tags li:nth-child(3){background:#E2D7FF}
+.fine{margin:12px 0 0;font:500 11.5px/1.4 var(--f-body);color:var(--muted)}
+.status{margin:10px 0 4px;font:600 14px/1.4 var(--f-body);display:flex;align-items:center;gap:10px;flex-wrap:wrap}
+.status.ok{color:#22774B}
+.status.err{color:#B3261E}
+.mine{margin-top:10px;border-top:1.5px dashed #E4DCD3;padding-top:8px}
+.mine summary{cursor:pointer;font:700 14px var(--f-body)}
+.mine dl{margin:8px 0 0;display:grid;gap:6px}
+.mine dt{font:600 12px/1.3 var(--f-body);color:var(--muted)}
+.mine dd{margin:0;font:500 14px/1.35 var(--f-body);overflow-wrap:anywhere}
+
+/* motion */
+.bit{position:fixed;z-index:50;width:8px;height:8px;pointer-events:none;animation:bit .75s ease-out forwards}
+.pop{transform-box:fill-box;transform-origin:50% 100%;animation:pop .6s cubic-bezier(.2,1.5,.4,1) both;animation-delay:var(--d,0s)}
+.popin{transform-box:fill-box;transform-origin:center;animation:pp .5s cubic-bezier(.2,1.6,.4,1)}
+.sticker{transform-box:fill-box;transform-origin:center;animation:wob 3s ease-in-out infinite alternate}
+.bob{animation:bob 3.4s ease-in-out infinite alternate;animation-delay:var(--bd,0s)}
+.swing{transform-box:view-box;animation:swing 3.6s ease-in-out infinite alternate}
+.swing.s2{animation-delay:-1.6s}
+.steam{transform-box:fill-box;transform-origin:50% 100%;animation:steam 2.6s ease-in-out infinite}
+.steam.s2{animation-delay:1.3s}
+.bulb{animation:tw 1.6s ease-in-out infinite alternate}
+.tw{animation:tw 1.4s ease-in-out infinite alternate}
+.draw{stroke-dasharray:150;stroke-dashoffset:150;animation:draw .9s .8s ease forwards}
+.rise{transform-box:fill-box;animation:rise 2.4s ease-out both}
+.dots circle{animation:tw .9s ease-in-out infinite alternate}
+.dots circle:nth-child(2){animation-delay:.3s}
+.dots circle:nth-child(3){animation-delay:.6s}
+.buzz{transform-box:fill-box;transform-origin:center;animation:buzz .35s linear infinite}
+.argue .say{transform-box:fill-box;transform-origin:50% 100%;animation:argue .45s ease-in-out infinite}
+.argue.slow .say{animation-duration:1.1s}
+.letter{transform-box:fill-box;animation:letter .9s .35s cubic-bezier(.2,1.2,.4,1) both}
+[data-r="meterFill"]{transform-box:fill-box;transform-origin:50% 100%;transition:transform .7s cubic-bezier(.2,1.2,.3,1),fill .4s}
+[data-r="bulb"]{transition:fill .4s}
+
+@keyframes drift{from{transform:translate(0,0)}to{transform:translate(6vmax,5vmax)}}
+@keyframes fall{from{transform:translate(0,0) rotate(0)}to{transform:translate(var(--dx,20px),110vh) rotate(720deg)}}
+@keyframes artin{from{opacity:0;transform:translateY(14px)}to{opacity:1;transform:none}}
+@keyframes artout{to{opacity:0;transform:translateY(-10px)}}
+@keyframes cin{from{opacity:0;transform:translateY(18px)}to{opacity:1;transform:none}}
+@keyframes cintop{from{opacity:0;transform:translateY(-14px)}to{opacity:1;transform:none}}
+@keyframes cout{to{opacity:0;transform:translateY(-8px)}}
+@keyframes sel{40%{transform:scale(1.04)}}
+@keyframes nudge{50%{transform:translateX(4px)}}
+@keyframes bit{from{transform:translate(-50%,-50%) rotate(0);opacity:1}to{transform:translate(calc(-50% + var(--dx)),calc(-50% + var(--dy))) rotate(var(--rot));opacity:0}}
+@keyframes pop{from{opacity:0;transform:translateY(18px) scale(.4)}to{opacity:1;transform:none}}
+@keyframes pp{from{opacity:0;transform:scale(.2)}to{opacity:1;transform:none}}
+@keyframes wob{from{transform:rotate(-4deg)}to{transform:rotate(4deg)}}
+@keyframes bob{to{transform:translateY(-5px)}}
+@keyframes swing{from{transform:rotate(-3deg)}to{transform:rotate(3deg)}}
+@keyframes steam{0%{opacity:0;transform:translateY(6px)}45%{opacity:.55}100%{opacity:0;transform:translateY(-12px)}}
+@keyframes tw{from{opacity:1}to{opacity:.35}}
+@keyframes draw{to{stroke-dashoffset:0}}
+@keyframes rise{from{transform:translateY(46px)}to{transform:none}}
+@keyframes buzz{25%{transform:rotate(-2.5deg)}75%{transform:rotate(2.5deg)}}
+@keyframes argue{50%{transform:rotate(-4deg) scale(1.04)}}
+@keyframes jit{25%{transform:translate(-1px,1px)}75%{transform:translate(1px,-1px)}}
+@keyframes letter{from{transform:translateY(70px)}to{transform:none}}
+@keyframes flyl{to{transform:translate(-130%,-14px) rotate(-14deg);opacity:0}}
+@keyframes flyr{to{transform:translate(130%,-14px) rotate(14deg);opacity:0}}
+@keyframes flyu{to{transform:translateY(-70%) scale(.9);opacity:0}}
+@keyframes deal{from{transform:translateY(10px) scale(.95);opacity:.4}to{transform:none;opacity:1}}
+
+@media (max-height:660px){
+  .q{font-size:19px;margin-bottom:10px}
+  .opt{min-height:44px;padding:7px 11px;font-size:15px}
+  .m-pic{width:64px;height:64px}
+  .title{font-size:31px}
+}
+@media (prefers-reduced-motion:reduce){
+  *,*::before,*::after{animation-duration:.01ms!important;animation-iteration-count:1!important;transition-duration:.01ms!important}
+}
+</style>
+</head>
+<body>
+
+<div class="bgs" aria-hidden="true">
+  <div class="bg" id="bgA"></div>
+  <div class="bg" id="bgB"></div>
+  <div class="fall" id="fall"></div>
+</div>
+
+<main class="app" id="app" data-mode="start">
+  <header class="top">
+    <div class="toprow"><span class="pc" id="pc"></span><span class="pt" id="pt"></span></div>
+    <div class="segs" id="segs" aria-hidden="true"><i><b></b></i><i><b></b></i><i><b></b></i><i><b></b></i><i><b></b></i><i><b></b></i></div>
+  </header>
+  <div class="scene" id="scene"></div>
+  <section class="card" id="card" aria-label="Survey question"></section>
+</main>
+
+<script>
+(function () {
+'use strict';
+
+/* ================= settings =================
+   Answers are saved to Supabase. The publishable key is safe to be public:
+   the database only lets visitors add a response, never read one. */
+const SUPABASE_URL = 'https://rihgdvyhaibolvznlcgx.supabase.co';
+const SUPABASE_KEY = 'sb_publishable_7C1gKNK6UaeVfZ6FvdaFzg_ju9thZFE';
+const LIVE = !!(SUPABASE_URL && SUPABASE_KEY);
+
+/* ================= survey content ================= */
+const DIFF = ['Very easy', 'Easy', 'Neutral', 'Difficult', 'Very difficult'];
+const HAPPY = ['Very unhappy', 'Unhappy', 'Okay', 'Happy', 'Very happy'];
+const UPCOMING = 'I am getting married in the next few months';
+
+const CHAPTERS = [
+  { title: 'About the wedding', bg: ['#FFE6D5', '#FFF6EE'], blobs: ['#FFC9A8', '#FFE29A', '#FFD1DC'], scene: sceneHome, react: reactHome },
+  { title: 'Wedding shopping', bg: ['#FFE0EA', '#FFF6F9'], blobs: ['#FFB8CC', '#FFD9A0', '#D9C9FF'], scene: sceneShopping, react: reactShopping },
+  { title: 'Finding vendors', bg: ['#D9F4E8', '#F4FCF8'], blobs: ['#A8E6CB', '#BDE3FA', '#FFE29A'], scene: scenePhone, react: reactPhone },
+  { title: 'Prices and payments', bg: ['#FFF0C2', '#FFFAEA'], blobs: ['#FFE08A', '#FFC9A8', '#B9EAD3'], scene: scenePrices, react: reactPrices },
+  { title: 'Family and the big days', bg: ['#EAE2FF', '#F9F6FF'], blobs: ['#D2C2FF', '#FFC6D3', '#BDE3FA'], scene: sceneFamily, react: reactFamily },
+  { title: 'Looking back', bg: ['#DDEFFB', '#F5FBFE'], blobs: ['#B5DDF7', '#FFD9A0', '#C9F0DD'], scene: sceneDayAfter, react: reactDayAfter }
+];
+const START_BG = { bg: ['#FFE6D5', '#FFF6EE'], blobs: ['#FFC9A8', '#FFE29A', '#C9F0DD'] };
+const END_BG = { bg: ['#FFE3EC', '#FFF8F0'], blobs: ['#FFC6D3', '#FFE29A', '#C9F0DD'] };
+
+const Q = [
+  /* 1. About the wedding */
+  { id: 'q1', ch: 0, kicker: "Let's begin.", q: 'Which of these describes you?', type: 'single', layout: 'list',
+    opts: ['I got married in the last 12 months', 'I got married 1 to 3 years ago', UPCOMING, 'None of these'], endOn: 'None of these',
+    key: 'Q1 Which describes you' },
+  { id: 'q2', ch: 0, kicker: a => a.q1 === UPCOMING ? 'Wedding still coming up? Answer based on your planning so far.' : 'And you are…',
+    q: 'Who are you answering as?', type: 'single', layout: 'grid',
+    opts: ['Bride', 'Groom', 'Parent of the bride or groom', 'Sibling or other relative'], key: 'Q2 Answering as' },
+  { id: 'q3', ch: 0, kicker: 'Watch the picture change as you answer.', q: 'Tell us a little about the wedding.', type: 'group', parts: [
+    { id: 'q3a', label: 'Which city is the wedding in?', type: 'text', placeholder: 'e.g. Hyderabad', optional: true, key: 'Q3 City' },
+    { id: 'q3b', label: 'Who mainly planned it?', type: 'single',
+      opts: ['Our family, on our own', 'Family with a part-time or wedding-day coordinator', 'A full-service wedding planner'], key: 'Q4 Who planned the wedding' },
+    { id: 'q3c', label: 'Roughly, what was the total budget?', type: 'single', optional: true,
+      opts: ['Under ₹10 lakh', '₹10 to 25 lakh', '₹25 to 50 lakh', 'Above ₹50 lakh', 'Prefer not to say'], key: 'Q5 Budget' }
+  ] },
+
+  /* 2. Wedding shopping */
+  { id: 'q4', ch: 1, kicker: 'Lehenga, sherwani, sarees, jewellery… fill the bags.', q: 'Where did you buy the wedding clothes and jewellery?', type: 'multi', layout: 'chips',
+    opts: ['Local markets', 'Big stores or showrooms', 'Designer boutiques', 'Online', 'Got them stitched by a tailor', 'Rented some outfits', 'Other'],
+    key: 'Q6 Where clothes and jewellery were bought' },
+  { id: 'q5', ch: 1, kicker: 'Spice check. Drag the chilli.', q: 'How easy or difficult was wedding shopping and tailoring?', type: 'scale',
+    icon: 'chilli', labels: DIFF, key: 'Q7 Shopping and tailoring (1 very easy, 5 very difficult)' },
+  { id: 'q6', ch: 1, show: a => a.q5 >= 3, kicker: 'What went wrong?', q: 'What made shopping and tailoring hard?', type: 'multi', layout: 'chips',
+    opts: ['Had to visit too many shops', 'Prices were high or not clear', 'Hard to find the right fit or size', 'Tailor or boutique delivered late',
+      'Stitching had to be redone', 'Hard to match outfits for the family', 'Other'], key: 'Q8 What made shopping and tailoring hard' },
+
+  /* 3. Finding vendors */
+  { id: 'q7', ch: 2, kicker: 'Photographer, caterer, decorator, mehendi…', q: 'Tell us about your vendors.', type: 'group', parts: [
+    { id: 'q7a', label: 'How many vendors did you book?', type: 'single', opts: ['1 to 5', '6 to 10', '11 to 15', 'More than 15', 'Not sure'], key: 'Q9 Vendors booked' },
+    { id: 'q7b', label: 'How did you find them?', type: 'multi',
+      opts: ['Family or friends', 'Wedding websites or apps', 'Instagram', 'Google search', 'Suggested by the venue', 'Other'], key: 'Q10 How vendors were found' }
+  ] },
+  { id: 'q8', ch: 2, kicker: 'Spice check again.', q: 'How easy or difficult was it to find the right vendors?', type: 'scale',
+    icon: 'chilli', labels: DIFF, key: 'Q11 Finding the right vendors (1 very easy, 5 very difficult)' },
+  { id: 'q9', ch: 2, show: a => a.q8 >= 4, kicker: 'What made it hard?', q: 'What made it difficult to find vendors?', type: 'multi', layout: 'chips',
+    opts: ['Too many options to compare', 'Hard to know whom to trust', 'Good ones were busy on our dates', 'Details were spread across many apps and contacts', 'Other'],
+    key: 'Q12 What made finding vendors difficult' },
+
+  /* 4. Prices and payments */
+  { id: 'q10', ch: 3, kicker: '"What is the rate?" "Depends…"', q: 'How did most vendors share their prices?', type: 'single', layout: 'list',
+    opts: ['A clear written quote', 'A rough price on call or chat', 'We had to ask again and again', 'We knew the full amount only at the end'],
+    key: 'Q13 How vendors shared prices' },
+  { id: 'q11', ch: 3, kicker: 'Watch the bill.', q: 'Did any of these happen with prices?', type: 'multi', layout: 'chips', exclusive: 'None of these',
+    opts: ['Extra charges were added later', 'Price went up after booking', 'Quotes were hard to compare', 'We felt charged more because it was a wedding',
+      'We had to bargain a lot', 'None of these'], key: 'Q14 Problems with prices' },
+  { id: 'q12', ch: 3, kicker: 'Who promised what, and who paid what.', q: 'Keeping track of deals and payments.', type: 'group', parts: [
+    { id: 'q12a', label: 'Where did you keep track of what each vendor agreed to?', type: 'multi',
+      opts: ['WhatsApp chats', 'Notebook or diary', 'Excel or Google Sheets', 'A planning app', 'Nowhere, we remembered', 'Other'], key: 'Q15 Where agreements were tracked' },
+    { id: 'q12b', label: 'How did you mostly pay the vendors?', type: 'multi', opts: ['Cash', 'UPI', 'Bank transfer', 'Card', 'Cheque'], key: 'Q16 How vendors were paid' }
+  ] },
+  { id: 'q13', ch: 3, kicker: 'Advance paid. Balance…?', q: 'And the money side of it.', type: 'group', parts: [
+    { id: 'q13a', label: 'Were you ever unsure how much was still to be paid to a vendor?', type: 'single', opts: ['Yes, often', 'Yes, once or twice', 'No'],
+      key: 'Q17 Unsure how much was still to be paid' },
+    { id: 'q13b', label: 'Did your budget go up during planning?', type: 'single', opts: ['Yes, a lot', 'Yes, a little', 'No', 'Too early to say'], key: 'Q18 Budget went up' }
+  ] },
+
+  /* 5. Family and the big days */
+  { id: 'q14', ch: 4, kicker: 'Mummy said red. Chachi said white.', q: 'Family and vendors.', type: 'group', parts: [
+    { id: 'q14a', label: 'How many people in your family talked to the vendors?', type: 'single', opts: ['Only 1', '2', '3 or 4', '5 or more'],
+      key: 'Q19 Family members who talked to vendors' },
+    { id: 'q14b', label: 'Did a vendor ever get different instructions from different family members?', type: 'single',
+      opts: ['Yes, often', 'Yes, once or twice', 'No', "Don't know"], key: 'Q20 Vendor got different instructions from family' }
+  ] },
+  { id: 'q15', ch: 4, kicker: 'Promised vs. delivered.', q: 'How did the vendors do?', type: 'group', parts: [
+    { id: 'q15a', label: 'Did any vendor deliver something different from what was agreed?', type: 'single', opts: ['Yes', 'No', 'Not sure'],
+      key: 'Q21 Vendor delivered something different' },
+    { id: 'q15b', label: 'Overall, how happy are you with your vendors?', type: 'scale', icon: 'face', labels: HAPPY,
+      key: 'Q22 Happy with vendors (1 very unhappy, 5 very happy)' }
+  ] },
+
+  /* 6. Looking back */
+  { id: 'q16', ch: 5, kicker: 'Quick round. One tap per card.', q: 'How easy or difficult was each of these?', type: 'rapid', labels: DIFF,
+    rows: ['Comparing prices and quotes', 'Keeping track of what each vendor promised', 'Keeping track of payments', 'Following up with vendors',
+      'Coordinating with family members', 'Wedding shopping and tailoring', 'Handling problems on the wedding days'] },
+  { id: 'q17', ch: 5, kicker: 'The big one. Take your time.', q: 'What was the biggest problem you faced while planning the wedding?', type: 'long',
+    placeholder: 'Tell us what happened…', key: 'Q24 Biggest problem' },
+  { id: 'q18', ch: 5, kicker: 'Got 10 minutes some day?', q: 'Would you be open to a 10-minute call to tell us more?', type: 'call',
+    opts: ['Yes, happy to talk', 'No, thanks'], key: 'Q25 Open to a 10-minute call' }
+];
+
+/* ================= drawing helpers ================= */
+const INK = '#2D2433';
+const st = (w = 3) => `stroke="${INK}" stroke-width="${w}" stroke-linejoin="round" stroke-linecap="round"`;
+const pop = (d, inner) => `<g class="pop" style="--d:${d}s">${inner}</g>`;
+const at = (x, y, inner, rot) => `<g transform="translate(${x} ${y})${rot ? ` rotate(${rot})` : ''}">${inner}</g>`;
+const art = inner => `<svg class="art" viewBox="0 0 360 260" preserveAspectRatio="xMidYMax meet" aria-hidden="true" focusable="false">${inner}</svg>`;
+const f1 = n => (+n).toFixed(1);
+function along(x1, y1, x2, y2, sag, n, fn) {
+  let s = '';
+  for (let k = 0; k <= n; k++) { const t = k / n; s += fn(x1 + (x2 - x1) * t, y1 + (y2 - y1) * t + sag * 4 * t * (1 - t), k); }
+  return s;
+}
+function lights(x1, y1, x2, y2, sag, n, offEvery) {
+  const cols = ['#FFD45C', '#FF9F7A', '#FF8FB1', '#9BE0C1'];
+  let s = `<path d="M${x1} ${y1} Q${(x1 + x2) / 2} ${(y1 + y2) / 2 + sag * 2} ${x2} ${y2}" fill="none" stroke="${INK}" stroke-width="1.6" opacity=".7"/>`;
+  s += along(x1, y1, x2, y2, sag, n, (x, y, k) => {
+    if (k === 0 || k === n) return '';
+    const off = offEvery && k % offEvery === 0, c = off ? '#CFC6D6' : cols[k % 4];
+    return `<g class="${off ? '' : 'bulb'}" style="animation-delay:${(k % 5) * 0.35}s"><circle cx="${f1(x)}" cy="${f1(y + 5)}" r="3.8" fill="${c}" ${st(1.2)}/></g>`;
+  });
+  return s;
+}
+function kulhad(x, d) {
+  return at(x, 250, pop(d,
+    `<path class="steam" d="M-6 -52 q-6 -8 0 -16 q6 -8 0 -16" fill="none" stroke="${INK}" stroke-width="2.6" stroke-linecap="round" opacity=".45"/>
+     <path class="steam s2" d="M6 -50 q-6 -8 0 -16 q6 -8 0 -16" fill="none" stroke="${INK}" stroke-width="2.6" stroke-linecap="round" opacity=".45"/>
+     <path d="M-20 -44 L20 -44 L14 0 L-14 0 Z" fill="#D9825B" ${st()}/>
+     <ellipse cx="0" cy="-44" rx="20" ry="5.5" fill="#F1D3A8" ${st()}/>
+     <path d="M-16 -28 L16 -28" stroke="#A85A3A" stroke-width="2.5" stroke-linecap="round"/>`));
+}
+const sticker = (key, inner) => `<g data-r="${key}" display="none"><g class="sticker">${inner}</g></g>`;
+const R = (root, key) => root.querySelector(`[data-r="${key}"]`);
+function repop(el) { if (!el || reduce) return; el.classList.remove('popin'); void el.getBoundingClientRect(); el.classList.add('popin'); }
+function toggle(root, key, on) {
+  const el = R(root, key);
+  if (!el) return;
+  const was = el.getAttribute('display') !== 'none';
+  if (on) { el.removeAttribute('display'); if (!was) repop(el); } else el.setAttribute('display', 'none');
+}
+function setText(root, key, txt) { const el = R(root, key); if (el && el.textContent !== txt) { el.textContent = txt; repop(el); } }
+
+/* ---------- 1. about the wedding: calendar, chai, laddoos ---------- */
+const lad = (x, y) => `<g transform="translate(${f1(x)} ${y})"><circle r="13" fill="#FFB547" ${st(2.5)}/><circle cx="-5" cy="-6" r="3" fill="#FFE0A0"/><circle cx="-3" cy="3" r="1.5" fill="#D9821A"/><circle cx="5" cy="-3" r="1.4" fill="#D9821A"/><circle cx="5" cy="6" r="1.5" fill="#D9821A"/></g>`;
+function laddoos(n) {
+  const rows = n === 3 ? 2 : n === 6 ? 3 : 4;
+  let s = '';
+  for (let r = 0; r < rows; r++) { const c = rows - r; for (let k = 0; k < c; k++) s += lad((k - (c - 1) / 2) * 26, -6 - r * 22); }
+  return s;
+}
+function sceneHome() {
+  let cells = '';
+  for (let r = 0; r < 5; r++) for (let c = 0; c < 7; c++) {
+    if (r === 1 && c === 4) continue;
+    cells += `<rect x="${9 + c * 17}" y="${50 + r * 17}" width="13" height="13" rx="3" fill="${c === 0 ? '#FFD1DC' : '#EFEAF3'}"/>`;
+  }
+  const cal = at(24, 84, pop(0.05, `
+    <rect x="0" y="0" width="136" height="164" rx="12" fill="#fff" ${st()}/>
+    <path d="M0 12 a12 12 0 0 1 12 -12 h112 a12 12 0 0 1 12 12 v26 h-136 z" fill="#FF7A59" ${st()}/>
+    <text class="tb" x="68" y="26" text-anchor="middle" font-size="15" fill="#fff" letter-spacing="2">DECEMBER</text>
+    <rect x="30" y="-10" width="8" height="19" rx="4" fill="${INK}"/><rect x="98" y="-10" width="8" height="19" rx="4" fill="${INK}"/>
+    ${cells}
+    <text class="tb" x="83.5" y="78" text-anchor="middle" font-size="13" fill="#C24A2C">12</text>
+    <path class="draw" d="M71 72 C71 61 96 60 96 73 C96 86 71 87 70.5 73 C70 66 77 62 88 62" fill="none" stroke="#FF7A59" stroke-width="2.6" stroke-linecap="round"/>
+    <text class="tk" x="64" y="153" font-size="17" fill="#C24A2C" transform="rotate(-5 64 153)">shaadi!</text>
+    <path d="M110 140 Q118 118 96 88" fill="none" stroke="#FF7A59" stroke-width="2" stroke-linecap="round" stroke-dasharray="3 4"/>`));
+  let sp = '';
+  [[-58, -70], [56, -86], [-40, -118], [44, -40]].forEach(([x, y], k) => { sp += `<path class="tw" style="animation-delay:${k * 0.3}s" d="M${x} ${y - 7} L${x + 2} ${y - 2} L${x + 7} ${y} L${x + 2} ${y + 2} L${x} ${y + 7} L${x - 2} ${y + 2} L${x - 7} ${y} L${x - 2} ${y - 2} Z" fill="#FFC93C" stroke="${INK}" stroke-width="1.2"/>`; });
+  const plate = at(276, 236, pop(0.3, `
+    <ellipse cx="0" cy="8" rx="64" ry="12" fill="#FFD27A" ${st()}/>
+    <g data-r="lad" data-n="6">${laddoos(6)}</g>
+    <g data-r="spark" display="none">${sp}</g>
+    <g data-r="cover" display="none"><path d="M-58 6 C-58 -66 58 -66 58 6 Z" fill="#E6DEF5" ${st()}/><circle cx="0" cy="-52" r="7" fill="#CDBDF5" ${st(2.5)}/><text class="tb" x="0" y="-12" text-anchor="middle" font-size="22" fill="${INK}">?</text></g>`));
+  const role = at(160, 90, sticker('role', `<circle r="28" fill="#FFD95A" ${st()}/><text class="tb" data-r="roleText" y="-3" text-anchor="middle" font-size="9" fill="${INK}" letter-spacing="1">I'M THE</text><text class="tb" data-r="roleText2" y="11" text-anchor="middle" font-size="12.5" fill="${INK}">BRIDE</text>`), 10);
+  const city = at(282, 70, sticker('city', `<rect x="-72" y="-17" width="144" height="34" rx="17" fill="#fff" ${st(2.5)}/><path d="M-56 -6 a7 7 0 1 1 14 0 c0 6 -7 12 -7 12 s-7 -6 -7 -12 Z" fill="#FF7A59" stroke="${INK}" stroke-width="1.8"/><circle cx="-49" cy="-6" r="2.4" fill="#fff"/><text class="tb" data-r="cityText" x="-36" y="5" font-size="14" fill="${INK}">Hyderabad</text>`));
+  return art(cal + kulhad(196, 0.55) + plate + role + city);
+}
+function reactHome(root, a) {
+  const roles = { 'Bride': 'BRIDE', 'Groom': 'GROOM', 'Parent of the bride or groom': 'PARENT', 'Sibling or other relative': 'SIBLING' };
+  toggle(root, 'role', !!roles[a.q2]);
+  if (roles[a.q2]) setText(root, 'roleText2', roles[a.q2]);
+  const city = (a.q3a || '').trim();
+  toggle(root, 'city', !!city);
+  if (city) setText(root, 'cityText', city.length > 13 ? city.slice(0, 12) + '…' : city);
+  const b = a.q3c;
+  const n = b === 'Under ₹10 lakh' ? 3 : (b === '₹25 to 50 lakh' || b === 'Above ₹50 lakh') ? 10 : 6;
+  const g = R(root, 'lad');
+  if (g && +g.dataset.n !== n) { g.innerHTML = laddoos(n); g.dataset.n = n; repop(g); }
+  toggle(root, 'spark', b === 'Above ₹50 lakh');
+  toggle(root, 'cover', b === 'Prefer not to say');
+  toggle(root, 'lad', b !== 'Prefer not to say');
+}
+
+/* ---------- 2. wedding shopping: rack, outfits, bags ---------- */
+const BAG = { 'Local markets': ['Market', '#FFB38A'], 'Big stores or showrooms': ['Store', '#9BE0C1'], 'Designer boutiques': ['Boutique', '#CDBDF5'],
+  'Online': ['Online', '#A9DCF7'], 'Got them stitched by a tailor': ['Tailor', '#FFD95A'], 'Rented some outfits': ['Rented', '#FFC6D3'], 'Other': ['Other', '#E8E1D8'] };
+const BAG_POS = [[200, 202], [248, 202], [296, 202], [222, 164], [268, 164], [314, 164], [246, 126]];
+function bags(list, fresh) {
+  const items = list.length ? list.map(o => BAG[o]) : [['', '#FFB38A'], ['', '#9BE0C1']];
+  const order = items.map((it, k) => ({ it, p: BAG_POS[k] })).sort((x, y) => x.p[1] - y.p[1]);
+  return order.map(({ it, p }) => `<g transform="translate(${p[0]} ${p[1]})"><g class="${fresh && fresh.has(it[0]) ? 'popin' : ''}">
+    <path d="M10 0 C10 -15 30 -15 30 0" fill="none" ${st(2.5)}/>
+    <path d="M0 0 H40 L43 46 H-3 Z" fill="${it[1]}" ${st(2.5)}/>
+    <text class="tb" x="20" y="29" text-anchor="middle" font-size="9.5" fill="${INK}">${it[0]}</text></g></g>`).join('');
+}
+function sceneShopping() {
+  let ticks = '';
+  for (let k = 0; k < 9; k++) ticks += `<path d="M${f1(99 + Math.sin(k) * 1.5)} ${92 + k * 9} h6" stroke="${INK}" stroke-width="1.2"/>`;
+  const rack = pop(0.05, `
+    <rect x="28" y="80" width="7" height="166" rx="3" fill="#D8D2E3" ${st(2.5)}/>
+    <rect x="173" y="80" width="7" height="166" rx="3" fill="#D8D2E3" ${st(2.5)}/>
+    <path d="M14 248 H50 M158 248 H194" fill="none" ${st(4)}/>
+    <path d="M102 79 C96 112 108 140 98 176" fill="none" stroke="${INK}" stroke-width="10" stroke-linecap="round"/>
+    <path d="M102 79 C96 112 108 140 98 176" fill="none" stroke="#FFD95A" stroke-width="7" stroke-linecap="round"/>${ticks}
+    <rect x="20" y="74" width="168" height="9" rx="4.5" fill="#D8D2E3" ${st(2.5)}/>`);
+  let zari = '';
+  [[40, 150], [60, 170], [84, 160], [104, 184], [52, 196], [80, 200], [98, 150]].forEach(([x, y]) => { zari += `<circle cx="${x}" cy="${y}" r="2.4" fill="#FFD95A"/>`; });
+  const lehenga = pop(0.2, `<g class="swing" style="transform-origin:72px 72px">
+    <path d="M72 72 C79 72 80 80 72 82 L72 88" fill="none" ${st(2.5)}/>
+    <path d="M46 100 L72 88 L98 100" fill="none" ${st(2.5)}/>
+    <path d="M52 100 L92 100 L96 122 L48 122 Z" fill="#E0457B" ${st(2.5)}/>
+    <path d="M48 122 L96 122 L124 224 L20 224 Z" fill="#FF9EBB" ${st(2.5)}/>
+    <path d="M25 210 Q72 220 119 210" fill="none" stroke="#FFD95A" stroke-width="5"/>${zari}</g>`);
+  const kurta = pop(0.35, `<g class="swing s2" style="transform-origin:140px 72px">
+    <path d="M140 72 C147 72 148 80 140 82 L140 88" fill="none" ${st(2.5)}/>
+    <path d="M114 100 L140 88 L166 100" fill="none" ${st(2.5)}/>
+    <path d="M120 102 L106 152 L116 155 L124 120 Z M160 102 L174 152 L164 155 L156 120 Z" fill="#F7D9A0" ${st(2.5)}/>
+    <path d="M120 100 L160 100 L167 214 L113 214 Z" fill="#F7D9A0" ${st(2.5)}/>
+    <path d="M132 100 L140 110 L148 100" fill="none" ${st(2)}/>
+    <path d="M140 112 V206" stroke="#C99A3B" stroke-width="2"/>
+    <circle cx="140" cy="124" r="2.4" fill="#C99A3B"/><circle cx="140" cy="140" r="2.4" fill="#C99A3B"/><circle cx="140" cy="156" r="2.4" fill="#C99A3B"/></g>`);
+  const late = at(210, 70, sticker('late', `<circle r="24" fill="#fff" ${st()}/><path d="M0 -12 V0 L9 6" fill="none" ${st(3)}/><rect x="-24" y="18" width="48" height="17" rx="8.5" fill="#FF7A59" ${st(2)}/><text class="tb" y="31" text-anchor="middle" font-size="10.5" fill="#fff">LATE</text>`), -8);
+  const redo = at(146, 176, sticker('redo', `<rect x="-26" y="-12" width="52" height="24" rx="12" fill="#CDBDF5" ${st(2.5)}/><text class="tb" y="5" text-anchor="middle" font-size="11.5" fill="${INK}">REDO</text>`), 8);
+  return art(rack + lehenga + kurta + `<g data-r="bags">${bags([])}</g>` + late + redo);
+}
+function reactShopping(root, a) {
+  const list = (a.q4 || []).filter(o => BAG[o]);
+  const g = R(root, 'bags');
+  const sig = list.join('|');
+  if (g && g.dataset.sig !== sig) {
+    const prev = new Set((g.dataset.sig || '').split('|').filter(Boolean).map(o => BAG[o] && BAG[o][0]));
+    const fresh = new Set(list.map(o => BAG[o][0]).filter(l => !prev.has(l)));
+    g.innerHTML = bags(list, reduce ? null : fresh);
+    g.dataset.sig = sig;
+  }
+  const probs = a.q6 || [];
+  toggle(root, 'late', probs.includes('Tailor or boutique delivered late'));
+  toggle(root, 'redo', probs.includes('Stitching had to be redone'));
+}
+
+/* ---------- 3. finding vendors: phone and visiting cards ---------- */
+function scenePhone() {
+  const bub = (side, y, text, d, w) => {
+    const x = side === 'r' ? 111 - w : 13, fill = side === 'r' ? '#D4F2C6' : '#fff';
+    return pop(d, `<rect x="${x}" y="${y}" width="${w}" height="20" rx="7" fill="${fill}" stroke="${INK}" stroke-width="1.6"/><text class="tm" x="${x + 7}" y="${y + 13.6}" font-size="9" fill="${INK}">${text}</text>`);
+  };
+  const vcard = (x, y, rot, d, name, sub, accent) => at(x, y, pop(d, `<g class="bob" style="--bd:${d * 2}s">
+    <rect width="96" height="56" rx="7" fill="#fff" ${st(2.5)}/>
+    <path d="M1.5 8 a6.5 6.5 0 0 1 6.5 -6.5 h4 v53 h-4 a6.5 6.5 0 0 1 -6.5 -6.5 z" fill="${accent}"/>
+    <text class="tb" x="20" y="21" font-size="10" fill="${INK}">${name}</text>
+    <text class="tm" x="20" y="34" font-size="8.5" fill="#6C6274">${sub}</text>
+    <text class="tm" x="20" y="47" font-size="8" fill="${INK}">+91 98XXX XXXXX</text></g>`), rot);
+  const phone = at(118, 12, pop(0.05, `<g data-r="phone">
+    <rect x="0" y="0" width="124" height="240" rx="20" fill="${INK}" ${st()}/>
+    <rect x="7" y="22" width="110" height="200" rx="6" fill="#F2F7F1"/>
+    <rect x="46" y="8" width="32" height="6" rx="3" fill="#4F4458"/>
+    <rect x="7" y="22" width="110" height="27" fill="#3E8E7E"/>
+    <circle cx="21" cy="35.5" r="7" fill="#FFD95A" stroke="#fff" stroke-width="1.5"/>
+    <text class="tb" x="33" y="39.5" font-size="10.5" fill="#fff">Shubh Decor</text>
+    ${bub('r', 58, 'Free on 12 Dec?', 0.4, 80)}
+    ${bub('l', 84, 'Yes ji. Which venue?', 0.8, 96)}
+    ${bub('r', 110, 'Price for 300 guests?', 1.2, 98)}
+    ${bub('l', 136, 'Will tell on call', 1.6, 82)}
+    ${bub('r', 162, 'Pls send in writing', 2.0, 90)}
+    ${pop(2.4, `<rect x="13" y="188" width="40" height="20" rx="7" fill="#fff" stroke="${INK}" stroke-width="1.6"/><g class="dots"><circle cx="24" cy="198" r="2.6" fill="${INK}"/><circle cx="33" cy="198" r="2.6" fill="${INK}"/><circle cx="42" cy="198" r="2.6" fill="${INK}"/></g>`)}
+    <rect x="47" y="228" width="30" height="4" rx="2" fill="#6B6075"/>
+    <g data-r="badgeG"><circle cx="122" cy="4" r="15" fill="#FF7A59" stroke="#fff" stroke-width="2.5"/><text class="tb" data-r="badge" x="122" y="9" text-anchor="middle" font-size="13" fill="#fff">3</text></g></g>`));
+  return art(
+    vcard(6, 46, -9, 0.25, 'RAJ CATERERS', 'Veg · Non-veg', '#FFB38A') +
+    vcard(4, 158, 7, 0.45, 'RITU MEHENDI', 'Bridal · Guests', '#9BE0C1') +
+    vcard(258, 30, 8, 0.35, 'LENS &amp; LIGHT', 'Photo · Video', '#CDBDF5') +
+    vcard(258, 146, -6, 0.55, 'SHUBH DECOR', 'Flowers · Lights', '#FFC6D3') +
+    phone);
+}
+function reactPhone(root, a) {
+  const n = { '1 to 5': '5', '6 to 10': '10', '11 to 15': '15', 'More than 15': '20+', 'Not sure': '?' }[a.q7a] || '3';
+  setText(root, 'badge', n);
+  const ph = R(root, 'phone');
+  if (ph) ph.classList.toggle('buzz', a.q8 >= 4);
+}
+
+/* ---------- 4. prices and payments: tag, bill, budget meter ---------- */
+function scenePrices() {
+  let teeth = '';
+  for (let k = 0; k < 6; k++) teeth += ' l-8.67 8 l-8.67 -8';
+  let coins = '';
+  for (let i = 0; i < 4; i++) coins += `<ellipse cx="0" cy="${-i * 8}" rx="22" ry="7" fill="#FFD27A" ${st(2.5)}/>`;
+  const tag = `<path d="M70 14 V52" fill="none" ${st(2)}/><g class="swing" style="transform-origin:70px 14px">${pop(0.1, `
+    <path d="M32 52 H108 V138 L70 166 L32 138 Z" fill="#FFE3EC" ${st()}/>
+    <circle cx="70" cy="66" r="6" fill="#fff" ${st(2.5)}/>
+    <text class="tb" data-r="tagText" x="70" y="114" text-anchor="middle" font-size="16" fill="${INK}">₹ ?</text>`)}</g>`;
+  const bill = at(118, 30, pop(0.25, `
+    <path d="M0 0 H104 V194${teeth} Z" fill="#fff" ${st()}/>
+    <text class="tb" x="52" y="22" text-anchor="middle" font-size="13" fill="${INK}" letter-spacing="2">BILL</text>
+    <path d="M10 31 H94" stroke="${INK}" stroke-width="1.4" stroke-dasharray="3 3"/>
+    <text class="tm" x="10" y="50" font-size="10" fill="${INK}">Decor</text><text class="tm" x="94" y="50" font-size="10" fill="${INK}" text-anchor="end">₹1.2L</text>
+    <text class="tm" x="10" y="66" font-size="10" fill="${INK}">Photos</text><text class="tm" x="94" y="66" font-size="10" fill="${INK}" text-anchor="end">₹85k</text>
+    <text class="tm" x="10" y="82" font-size="10" fill="${INK}">Catering</text><text class="tm" x="94" y="82" font-size="10" fill="${INK}" text-anchor="end">₹3.4L</text>
+    <g data-r="extras"></g>
+    <path d="M10 160 H94" stroke="${INK}" stroke-width="1.4"/>
+    <text class="tb" x="10" y="176" font-size="11" fill="${INK}">TOTAL</text><text class="tb" data-r="total" x="94" y="176" font-size="11" fill="${INK}" text-anchor="end">₹ ?</text>
+    <text class="tm" data-r="paidBy" x="10" y="190" font-size="8.5" fill="#6C6274">Paid by: …</text>`));
+  const stamp = at(176, 168, `<g data-r="stamp"><rect x="-36" y="-15" width="72" height="30" rx="5" fill="#fff" fill-opacity=".9" stroke="#E0453A" stroke-width="3" data-r="stampBox"/><text class="tb" data-r="stampText" y="6" text-anchor="middle" font-size="16" fill="#E0453A">PAID?</text></g>`, -14);
+  const meter = pop(0.4, `
+    <text class="tb" x="290" y="44" text-anchor="middle" font-size="11" fill="${INK}" letter-spacing="1.5">BUDGET</text>
+    <g data-r="spill" display="none"><path d="M264 66 q-6 -10 0 -16 q6 6 0 16 Z M318 70 q-5 -8 0 -13 q5 5 0 13 Z" fill="#FF5A5F" ${st(1.5)}/></g>
+    <rect x="274" y="54" width="32" height="170" rx="16" fill="#fff" ${st()}/>
+    <rect data-r="meterFill" x="281" y="62" width="18" height="166" rx="9" fill="#FFC93C" style="transform:scaleY(.5)"/>
+    <circle data-r="bulb" cx="290" cy="228" r="20" fill="#FFC93C" ${st()}/>
+    <path d="M306 90 h6 M306 130 h6 M306 170 h6" stroke="${INK}" stroke-width="2" stroke-linecap="round"/>`);
+  return art(tag + at(70, 246, pop(0.5, coins + `<text class="tb" x="0" y="-20" text-anchor="middle" font-size="10" fill="${INK}">₹</text>`)) + bill + stamp + meter);
+}
+const EXTRA = { 'Extra charges were added later': '+ Extra charges', 'Price went up after booking': '+ Price went up',
+  'Quotes were hard to compare': '? Which quote', 'We felt charged more because it was a wedding': '+ "Wedding rate"', 'We had to bargain a lot': '− Bargained' };
+function reactPrices(root, a) {
+  const tagT = { 'A clear written quote': '₹ 45,000', 'A rough price on call or chat': '₹ 40k?', 'We had to ask again and again': '₹ ??',
+    'We knew the full amount only at the end': '₹ ???' }[a.q10] || '₹ ?';
+  setText(root, 'tagText', tagT);
+  const probs = a.q11 || [];
+  const ex = R(root, 'extras');
+  const sig = probs.join('|');
+  if (ex && ex.dataset.sig !== sig) {
+    ex.dataset.sig = sig;
+    if (probs.includes('None of these')) ex.innerHTML = `<text class="tm popin" x="10" y="104" font-size="10" fill="#22774B">No surprises ✓</text>`;
+    else ex.innerHTML = probs.filter(p => EXTRA[p]).slice(0, 4).map((p, k) => `<text class="tm popin" x="10" y="${102 + k * 15}" font-size="10" fill="#C24A2C">${EXTRA[p].replace(/"/g, '&quot;')}</text><text class="tm popin" x="94" y="${102 + k * 15}" font-size="10" fill="#C24A2C" text-anchor="end">?</text>`).join('');
+  }
+  const bad = probs.length && !probs.includes('None of these');
+  setText(root, 'total', bad ? '₹ ???' : '₹ ?');
+  const short = { 'Cash': 'Cash', 'UPI': 'UPI', 'Bank transfer': 'Bank', 'Card': 'Card', 'Cheque': 'Cheque' };
+  const paid = (a.q12b || []).map(x => short[x]).join(', ');
+  setText(root, 'paidBy', 'Paid by: ' + (paid || '…'));
+  const st13 = a.q13a;
+  const ok = st13 === 'No';
+  setText(root, 'stampText', ok ? 'PAID ✓' : st13 === 'Yes, often' ? 'PAID??' : 'PAID?');
+  const sb = R(root, 'stampBox'), stx = R(root, 'stampText'), col = ok ? '#22774B' : '#E0453A';
+  if (sb) sb.setAttribute('stroke', col);
+  if (stx) stx.setAttribute('fill', col);
+  const m = { 'Yes, a lot': [1, '#FF5A5F'], 'Yes, a little': [0.72, '#FF9F43'], 'No': [0.42, '#5CC48F'], 'Too early to say': [0.55, '#B9B0C9'] }[a.q13b] || [0.5, '#FFC93C'];
+  const fill = R(root, 'meterFill'), bulb = R(root, 'bulb');
+  if (fill) { fill.style.transform = `scaleY(${m[0]})`; fill.setAttribute('fill', m[1]); }
+  if (bulb) bulb.setAttribute('fill', m[1]);
+  toggle(root, 'spill', a.q13b === 'Yes, a lot');
+}
+
+/* ---------- 5. family: up to five relatives who all talk to vendors ---------- */
+function person(o) {
+  const y = -84;
+  let s = '';
+  const hc = o.hairC || INK;
+  if (o.longHair) s += `<path d="M-31 ${y} Q-36 ${y + 38} -24 ${y + 46} L24 ${y + 46} Q36 ${y + 38} 31 ${y} Z" fill="${hc}"/>`;
+  s += `<path d="M-46 0 Q-46 ${y + 42} 0 ${y + 40} Q46 ${y + 42} 46 0 Z" fill="${o.cloth}" ${st()}/>`;
+  if (o.pallu) s += `<path d="M-26 ${y + 46} L40 -1 L18 -1 L-38 ${y + 56} Z" fill="${o.pallu}" stroke="${INK}" stroke-width="2" stroke-linejoin="round"/>`;
+  if (o.buttons) s += `<circle cx="0" cy="${y + 58}" r="2.4" fill="${INK}"/><circle cx="0" cy="${y + 70}" r="2.4" fill="${INK}"/>`;
+  s += `<rect x="-8" y="${y + 22}" width="16" height="20" fill="${o.skin}" ${st(2.5)}/>`;
+  s += `<circle cx="0" cy="${y}" r="28" fill="${o.skin}" ${st()}/>`;
+  if (o.hair === 'bun') s += `<circle cx="0" cy="${y - 33}" r="12" fill="${hc}"/><path d="M-28 ${y - 2} Q-29 ${y - 30} 0 ${y - 30} Q29 ${y - 30} 28 ${y - 2} Q15 ${y - 20} 0 ${y - 18} Q-15 ${y - 20} -28 ${y - 2} Z" fill="${hc}"/>`;
+  if (o.hair === 'short') s += `<path d="M-27 ${y - 6} Q-26 ${y - 31} 0 ${y - 30} Q26 ${y - 31} 27 ${y - 6} Q12 ${y - 22} 0 ${y - 21} Q-12 ${y - 22} -27 ${y - 6} Z" fill="${hc}" stroke="${INK}" stroke-width="2"/>`;
+  if (o.hair === 'long') s += `<path d="M-29 ${y + 4} Q-30 ${y - 31} 0 ${y - 30} Q30 ${y - 31} 29 ${y + 4} Q22 ${y - 16} 2 ${y - 20} L0 ${y - 28} L-2 ${y - 20} Q-22 ${y - 16} -29 ${y + 4} Z" fill="${hc}"/>`;
+  s += `<circle cx="-10" cy="${y + 2}" r="2.8" fill="${INK}"/><circle cx="10" cy="${y + 2}" r="2.8" fill="${INK}"/>`;
+  if (o.specs) s += `<circle cx="-10" cy="${y + 2}" r="7.5" fill="none" stroke="${INK}" stroke-width="2"/><circle cx="10" cy="${y + 2}" r="7.5" fill="none" stroke="${INK}" stroke-width="2"/><path d="M-2.5 ${y + 2} h5" stroke="${INK}" stroke-width="2"/>`;
+  const my = o.mustache ? 19 : 12;
+  if (o.mustache) s += `<path d="M-12 ${y + 13} Q0 ${y + 5} 12 ${y + 13} Q0 ${y + 10} -12 ${y + 13} Z" fill="${INK}" stroke="${INK}" stroke-width="2" stroke-linejoin="round"/>`;
+  s += `<path data-r="mouth" data-my="${y + my}" d="M-7 ${y + my} Q0 ${y + my + 6} 7 ${y + my}" fill="none" stroke="${INK}" stroke-width="2.5" stroke-linecap="round"/>`;
+  if (o.bindi) s += `<circle cx="0" cy="${y - 10}" r="3" fill="#E0453A"/>`;
+  if (o.earrings) s += `<circle cx="-28" cy="${y + 11}" r="3.6" fill="#FFD95A" stroke="${INK}" stroke-width="1.5"/><circle cx="28" cy="${y + 11}" r="3.6" fill="#FFD95A" stroke="${INK}" stroke-width="1.5"/>`;
+  return s;
+}
+const FAMILY = [
+  { x: 180, o: { cloth: '#7CCFA6', buttons: true, skin: '#C98C5F', hair: 'short', hairC: '#9A95A3', mustache: true, specs: true } },
+  { x: 110, o: { cloth: '#FF9F8A', pallu: '#FFD95A', skin: '#E2A97C', hair: 'bun', bindi: true } },
+  { x: 250, o: { cloth: '#B9A4F0', pallu: '#FFC6D3', skin: '#D9A06D', hair: 'long', longHair: true, earrings: true, bindi: true } },
+  { x: 42, o: { cloth: '#8CCBF0', skin: '#C68E62', hair: 'short' } },
+  { x: 318, o: { cloth: '#FFD27A', pallu: '#FFFFFF', skin: '#D6A27A', hair: 'bun', hairC: '#BEB8C6', specs: true } }
+];
+function sceneFamily() {
+  const order = [3, 4, 1, 2, 0];
+  const people = order.map(k => `<g transform="translate(${FAMILY[k].x} 252) scale(.8)"><g data-r="p${k}"${k > 2 ? ' display="none"' : ''}>${pop(0.05 + k * 0.08, person(FAMILY[k].o))}</g></g>`).join('');
+  const say = (key, cx, y, w, text, d) => `<g data-r="${key}">${pop(d, `<g class="bob" style="--bd:${d * 2}s"><g class="say">
+    <path d="M${cx - 8} ${y + 30} L${cx - 2} ${y + 45} L${cx + 7} ${y + 30}" fill="#fff" ${st(2.5)}/>
+    <rect x="${cx - w / 2}" y="${y}" width="${w}" height="32" rx="12" fill="#fff" ${st(2.5)}/>
+    <rect x="${cx - 6.5}" y="${y + 27}" width="12" height="4" fill="#fff"/>
+    <text class="tb" x="${cx}" y="${y + 21.5}" text-anchor="middle" font-size="14" fill="${INK}">${text}</text></g></g>`)}</g>`;
+  const huh = at(330, 96, sticker('huh', `<circle r="20" fill="#FFD95A" ${st()}/><text class="tb" y="7" text-anchor="middle" font-size="19" fill="${INK}">?!</text>`), 10);
+  return art(people + `<g data-r="talk">${say('b1', 110, 62, 104, 'Red flowers!', 0.6)}${say('b0', 180, 22, 122, 'Stay in budget!', 1.0)}${say('b2', 250, 62, 108, 'No no, white!', 1.4)}</g>` + huh);
+}
+function reactFamily(root, a) {
+  const n = { 'Only 1': 1, '2': 2, '3 or 4': 4, '5 or more': 5 }[a.q14a] || 3;
+  for (let k = 0; k < 5; k++) toggle(root, 'p' + k, k < n);
+  for (let k = 0; k < 3; k++) toggle(root, 'b' + k, k < n);
+  const talk = R(root, 'talk');
+  if (talk) { talk.classList.toggle('argue', /^Yes/.test(a.q14b || '')); talk.classList.toggle('slow', a.q14b === 'Yes, once or twice'); }
+  toggle(root, 'huh', a.q15a === 'Yes');
+  const v = a.q15b;
+  root.querySelectorAll('[data-r="mouth"]').forEach(m => {
+    const y = +m.dataset.my;
+    m.setAttribute('d', v == null || v >= 4 ? `M-7 ${y} Q0 ${y + 6} 7 ${y}` : v === 3 ? `M-6 ${y + 2} L6 ${y + 2}` : `M-7 ${y + 4} Q0 ${y - 2} 7 ${y + 4}`);
+  });
+}
+
+/* ---------- 6. looking back: the morning after ---------- */
+function sceneDayAfter() {
+  const chair = oy => `
+    <rect x="9" y="${oy + 72}" width="8" height="74" rx="3" fill="#F2785A" ${st(2.5)}/>
+    <rect x="67" y="${oy + 72}" width="8" height="74" rx="3" fill="#F2785A" ${st(2.5)}/>
+    <rect x="4" y="${oy}" width="76" height="62" rx="12" fill="#FF8A6B" ${st()}/>
+    <rect x="16" y="${oy + 14}" width="52" height="7" rx="3.5" fill="#E0603F"/>
+    <rect x="16" y="${oy + 28}" width="52" height="7" rx="3.5" fill="#E0603F"/>
+    <rect x="16" y="${oy + 42}" width="52" height="7" rx="3.5" fill="#E0603F"/>
+    <rect x="0" y="${oy + 60}" width="84" height="13" rx="5" fill="#FF9F85" ${st()}/>`;
+  const ring = at(312, 112, sticker('ring', `<rect x="-14" y="-24" width="28" height="48" rx="7" fill="${INK}"/><rect x="-10" y="-17" width="20" height="32" rx="3" fill="#9BE0C1"/>
+    <path d="M20 -16 q8 8 0 16 M26 -22 q13 14 0 28 M-20 -16 q-8 8 0 16 M-26 -22 q-13 14 0 28" fill="none" stroke="${INK}" stroke-width="2.4" stroke-linecap="round"/>`), -10);
+  return art(
+    `<g class="rise"><circle cx="196" cy="214" r="74" fill="#FFD27A" opacity=".85"/><circle cx="196" cy="214" r="98" fill="#FFD27A" opacity=".25"/></g>` +
+    lights(-6, 16, 366, 30, 28, 18, 3) +
+    at(26, 74, pop(0.05, chair(30) + chair(20) + chair(10) + chair(0))) +
+    at(148, 172, pop(0.3, `
+      <rect x="0" y="0" width="106" height="76" rx="6" fill="#9A86D6" ${st()}/>
+      <rect x="7" y="7" width="92" height="62" rx="4" fill="none" stroke="#FFE29A" stroke-width="2"/>
+      <text class="tk" x="53" y="38" text-anchor="middle" font-size="15" fill="#FFE29A">Our Wedding</text>
+      <path d="M53 58 C48 53 44 50 47 46 C49 43 52 44 53 46.5 C54 44 57 43 59 46 C62 50 58 53 53 58 Z" fill="#FFE29A"/>`)) +
+    kulhad(300, 0.5) + ring);
+}
+function reactDayAfter(root, a) { toggle(root, 'ring', /^Yes/.test(a.q18 || '')); }
+
+/* ---------- the end: an envelope with a thank-you note ---------- */
+function sceneThanks() {
+  let hearts = '';
+  [[-120, -150, '#FF8FB1'], [118, -168, '#FF7A59'], [-104, -60, '#9BE0C1'], [130, -84, '#CDBDF5']].forEach(([x, y, c], k) => {
+    hearts += `<path class="tw" style="animation-delay:${k * 0.35}s" d="M${x} ${y + 8} C${x - 8} ${y} ${x - 10} ${y - 6} ${x - 5} ${y - 9} C${x - 2} ${y - 11} ${x} ${y - 8} ${x} ${y - 6} C${x} ${y - 8} ${x + 2} ${y - 11} ${x + 5} ${y - 9} C${x + 10} ${y - 6} ${x + 8} ${y} ${x} ${y + 8} Z" fill="${c}" ${st(1.8)}/>`;
+  });
+  return art(at(180, 250, pop(0.05, `
+    <path d="M-92 -112 H92 V0 H-92 Z" fill="#FFB38A" ${st()}/>
+    <g class="letter"><path d="M-74 -170 H74 V-30 H-74 Z" fill="#fff" ${st()}/>
+      <text class="tk" x="0" y="-130" text-anchor="middle" font-size="27" fill="${INK}">Thank you!</text>
+      <path d="M-44 -108 H44 M-44 -94 H30" stroke="#E4DCD3" stroke-width="3" stroke-linecap="round"/></g>
+    <path d="M-92 -112 L0 -50 L92 -112 V0 H-92 Z" fill="#FFC9A8" ${st()}/>
+    <path d="M-92 0 L-20 -58 M92 0 L20 -58" fill="none" ${st(2)}/>`) + hearts));
+}
+
+/* ================= state + helpers ================= */
+const $ = s => document.querySelector(s);
+const app = $('#app'), card = $('#card'), sceneEl = $('#scene'), fallEl = $('#fall');
+const reduce = matchMedia('(prefers-reduced-motion: reduce)').matches;
+const fresh = () => ({ mode: 'start', i: -1, sub: 0, answers: {}, hist: [], t0: 0 });
+let S = fresh();
+let curCh = -2, curScene = null, busy = false, sending = false, sent = false, bgFront = $('#bgA');
+const esc = s => String(s).replace(/[&<>"']/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]));
+
+(function () {
+  const cols = ['#FF7A59', '#FFD95A', '#9BE0C1', '#CDBDF5', '#A9DCF7', '#FF9EBB'];
+  let h = '';
+  for (let k = 0; k < 26; k++) {
+    h += `<i style="left:${(Math.random() * 100).toFixed(1)}%;background:${cols[k % 6]};animation-duration:${(5 + Math.random() * 6).toFixed(1)}s;animation-delay:-${(Math.random() * 10).toFixed(1)}s;--dx:${Math.round(Math.random() * 100 - 50)}px;border-radius:${k % 3 ? '2px' : '50%'}"></i>`;
+  }
+  fallEl.innerHTML = h;
+})();
+
+function setBg(c) {
+  const next = bgFront.id === 'bgA' ? $('#bgB') : $('#bgA');
+  next.style.transition = 'none';
+  next.classList.remove('on');
+  next.style.zIndex = '2';
+  bgFront.style.zIndex = '1';
+  next.style.background = `linear-gradient(180deg, ${c.bg[0]} 0%, ${c.bg[1]} 100%)`;
+  next.innerHTML = c.blobs.map((b, k) => `<div class="blob b${k + 1}" style="background:radial-gradient(circle, ${b} 0%, ${b}00 68%)"></div>`).join('');
+  void next.offsetWidth;
+  next.style.transition = '';
+  next.classList.add('on');
+  bgFront = next;
+}
+
+function showScene(fn) {
+  [...sceneEl.children].forEach(o => {
+    if (reduce) { o.remove(); return; }
+    o.classList.remove('in'); o.classList.add('out'); setTimeout(() => o.remove(), 360);
+  });
+  const w = document.createElement('div');
+  w.className = 'art-wrap in';
+  w.innerHTML = fn();
+  sceneEl.appendChild(w);
+  curScene = fn;
+  return w;
+}
+function reactNow() {
+  const ch = CHAPTERS[curCh], w = sceneEl.lastElementChild;
+  if (ch && ch.react && w) ch.react(w, S.answers);
+}
+
+function setChapter(c) {
+  if (c === curCh) return;
+  curCh = c;
+  const ch = CHAPTERS[c];
+  setBg(ch);
+  if (curScene !== ch.scene) showScene(ch.scene);
+  reactNow();
+}
+
+function setProgress() {
+  const c = Q[S.i].ch;
+  const inCh = Q.map((q, k) => k).filter(k => Q[k].ch === c && (k <= S.i || visible(Q[k])));
+  const frac = (inCh.indexOf(S.i) + 1) / inCh.length;
+  document.querySelectorAll('#segs b').forEach((b, k) => { b.style.width = k < c ? '100%' : k === c ? (frac * 100).toFixed(0) + '%' : '0%'; });
+  $('#pc').innerHTML = `<b>${c + 1}/6</b> · ${esc(CHAPTERS[c].title)}`;
+  let left = 0;
+  for (let k = S.i; k < Q.length; k++) if (visible(Q[k])) left += Q[k].type === 'group' || Q[k].type === 'rapid' ? 20 : 11;
+  $('#pt').textContent = left <= 15 ? 'last one!' : left < 60 ? 'under a minute left' : `about ${Math.round(left / 60)} min left`;
+}
+
+function swapCard(build, dir) {
+  const h0 = card.hidden ? 0 : card.getBoundingClientRect().height;
+  const old = card.firstElementChild;
+  const put = () => {
+    card.hidden = false;
+    card.innerHTML = '';
+    const el = build();
+    el.classList.add('cin');
+    if (dir < 0) el.classList.add('from-top');
+    card.appendChild(el);
+    card.scrollTop = 0;
+    if (!reduce && h0) {
+      const h1 = card.getBoundingClientRect().height;
+      if (Math.abs(h1 - h0) > 2) card.animate([{ height: h0 + 'px' }, { height: h1 + 'px' }], { duration: 300, easing: 'cubic-bezier(.2,.8,.2,1)' });
+    }
+    const f = el.querySelector('.q,.title');
+    if (f) f.focus({ preventScroll: true });
+  };
+  if (old && !reduce) { old.classList.add('out'); setTimeout(put, 150); } else put();
+}
+
+function burst(e, el, n) {
+  if (reduce) return;
+  let x = e && e.clientX, y = e && e.clientY;
+  if ((!x && !y) && el) { const r = el.getBoundingClientRect(); x = r.left + r.width / 2; y = r.top + r.height / 2; }
+  const cols = ['#FF7A59', '#FFD95A', '#9BE0C1', '#CDBDF5', '#A9DCF7'];
+  n = n || 10;
+  for (let k = 0; k < n; k++) {
+    const p = document.createElement('i');
+    const a = (k / n) * Math.PI * 2 + Math.random() * 0.5, d = 30 + Math.random() * (n > 12 ? 110 : 30);
+    p.className = 'bit';
+    p.style.left = x + 'px'; p.style.top = y + 'px';
+    p.style.background = cols[k % 5];
+    p.style.borderRadius = k % 2 ? '50%' : '2px';
+    p.style.setProperty('--dx', (Math.cos(a) * d).toFixed(1) + 'px');
+    p.style.setProperty('--dy', (Math.sin(a) * d).toFixed(1) + 'px');
+    p.style.setProperty('--rot', Math.round(Math.random() * 360) + 'deg');
+    document.body.appendChild(p);
+    setTimeout(() => p.remove(), 800);
+  }
+}
+
+/* ================= start ================= */
+function showStart() {
+  S = fresh();
+  sent = false;
+  app.dataset.mode = 'start';
+  curCh = -2;
+  setBg(START_BG);
+  fallEl.classList.remove('on');
+  if (curScene !== sceneHome) showScene(sceneHome);
+  else { const w = sceneEl.lastElementChild; if (w) reactHome(w, {}); }
+  swapCard(buildStart, 1);
+}
+function buildStart() {
+  const el = document.createElement('div');
+  el.innerHTML = `
+    <p class="eyebrow">A 4-minute survey</p>
+    <h1 class="title" tabindex="-1">Behind the <span>Shaadi</span></h1>
+    <p class="body">We are students at IIIT Hyderabad researching how families in India plan weddings: shopping, finding vendors, paying them and making decisions together.</p>
+    <p class="body small">For anyone who got married in the last three years, or is getting married in the next few months. Your answers stay anonymous and are used only for our course project.</p>
+    <ul class="tags"><li>About 4 minutes</li><li>Anonymous</li></ul>
+    <div class="actions"><button class="next big" id="startBtn" type="button">Let's start <span class="arr" aria-hidden="true">→</span></button></div>`;
+  el.querySelector('#startBtn').addEventListener('click', e => { burst(e, e.currentTarget, 14); beginStory(); });
+  return el;
+}
+function beginStory() {
+  S = fresh();
+  S.mode = 'q';
+  S.t0 = Date.now();
+  sent = false;
+  goQ(0, 1);
+}
+
+/* ================= questions ================= */
+const visible = q => !q.show || q.show(S.answers);
+function nextIdx(i) { for (let k = i + 1; k < Q.length; k++) if (visible(Q[k])) return k; return -1; }
+function answered(spec) {
+  const v = S.answers[spec.id];
+  if (spec.type === 'multi') return Array.isArray(v) && v.length > 0;
+  if (spec.type === 'text') return !!(v && String(v).trim());
+  return v != null && v !== '';
+}
+const groupOk = q => q.parts.every(p => p.optional || answered(p));
+
+function goQ(n, dir, keepSub) {
+  busy = false;
+  S.i = n;
+  S.mode = 'q';
+  app.dataset.mode = 'q';
+  fallEl.classList.remove('on');
+  const q = Q[n];
+  if (q.type === 'rapid' && !keepSub) S.sub = dir < 0 ? q.rows.length - 1 : 0;
+  setChapter(q.ch);
+  setProgress();
+  swapCard(() => buildQ(q), dir);
+}
+function advance() {
+  const q = Q[S.i];
+  S.hist.push(S.i);
+  if (q.endOn && S.answers[q.id] === q.endOn) { screenOut(); return; }
+  const n = nextIdx(S.i);
+  if (n < 0) finish(); else goQ(n, 1);
+}
+function back() {
+  if (busy) return;
+  const q = Q[S.i];
+  if (S.mode === 'q' && q && q.type === 'rapid' && S.sub > 0) {
+    S.sub--;
+    const box = card.querySelector('.rapid');
+    if (box && box._update) box._update(true);
+    return;
+  }
+  const p = S.hist.pop();
+  if (p === undefined) { showStart(); return; }
+  goQ(p, -1);
+}
+
+const HINT = { single: 'one tap', multi: 'pick all that apply', scale: 'drag or tap', rapid: 'one tap per card', group: 'answer each part', long: 'type, then Next', call: 'choose one' };
+
+function buildQ(q) {
+  const kicker = typeof q.kicker === 'function' ? q.kicker(S.answers) : q.kicker;
+  const el = document.createElement('div');
+  el.innerHTML = `
+    <p class="kicker">${esc(kicker)}</p>
+    <h2 class="q" id="qtext" tabindex="-1">${esc(q.q)}</h2>
+    ${q.type === 'multi' ? '<p class="sub">Pick all that apply.</p>' : ''}
+    <div class="answers"></div>
+    <div class="foot"><button class="back" type="button">← Back</button><span class="hint">${HINT[q.type]}</span></div>`;
+  el.querySelector('.back').addEventListener('click', back);
+  const box = el.querySelector('.answers');
+  const isLast = nextIdx(S.i) < 0;
+  ({ single: fillSingle, multi: fillMulti, scale: fillScale, rapid: fillRapid, long: fillLong, group: fillGroup, call: fillCall })[q.type](q, box, el, isLast);
+  return el;
+}
+
+function actions(el, label, onNext, skipLabel, onSkip) {
+  const row = document.createElement('div');
+  row.className = 'actions';
+  row.innerHTML = `<button class="next" type="button">${label}</button>${skipLabel ? `<button class="skip" type="button">${skipLabel}</button>` : ''}`;
+  row.querySelector('.next').addEventListener('click', onNext);
+  if (skipLabel) row.querySelector('.skip').addEventListener('click', onSkip);
+  el.querySelector('.answers').after(row);
+  return row.querySelector('.next');
+}
+
+function choices(spec, mount, layout, multi, labelId, onPick) {
+  const chip = layout === 'chips';
+  mount.classList.add(...(chip ? ['chips'] : ['answers', layout || 'list']));
+  if (!multi) { mount.setAttribute('role', 'radiogroup'); mount.setAttribute('aria-labelledby', labelId); }
+  const sel = new Set(multi ? (S.answers[spec.id] || []) : []);
+  let other = null;
+  const btns = [];
+  const paint = () => btns.forEach((b, j) => {
+    const o = spec.opts[j], on = multi ? sel.has(o) : S.answers[spec.id] === o;
+    b.classList.toggle('sel', on);
+    b.setAttribute(multi ? 'aria-pressed' : 'aria-checked', on ? 'true' : 'false');
+  });
+  spec.opts.forEach(o => {
+    const b = document.createElement('button');
+    b.type = 'button';
+    b.className = (chip ? 'chip' : 'opt') + (multi ? ' multi' : '');
+    if (!multi) b.setAttribute('role', 'radio');
+    b.innerHTML = chip ? esc(o) : `<span class="mark" aria-hidden="true"></span><span>${esc(o)}</span>`;
+    b.addEventListener('click', e => {
+      if (busy) return;
+      if (multi) {
+        if (sel.has(o)) sel.delete(o);
+        else {
+          sel.add(o);
+          if (spec.exclusive) {
+            if (o === spec.exclusive) [...sel].forEach(x => { if (x !== o) sel.delete(x); });
+            else sel.delete(spec.exclusive);
+          }
+          burst(e, b);
+        }
+        S.answers[spec.id] = spec.opts.filter(x => sel.has(x));
+        if (other) { other.hidden = !sel.has('Other'); if (o === 'Other' && sel.has('Other')) other.focus(); }
+      } else {
+        S.answers[spec.id] = o;
+        burst(e, b);
+      }
+      paint();
+      reactNow();
+      if (onPick) onPick(e, b, o);
+    });
+    mount.appendChild(b);
+    btns.push(b);
+  });
+  paint();
+  if (spec.opts.includes('Other')) {
+    other = document.createElement('input');
+    other.className = 'field other';
+    other.id = 'other-' + spec.id;
+    other.placeholder = 'Other: tell us what (optional)';
+    other.setAttribute('aria-label', 'Other, please describe');
+    other.value = S.answers[spec.id + '_other'] || '';
+    other.hidden = !sel.has('Other');
+    other.addEventListener('input', () => { S.answers[spec.id + '_other'] = other.value.trim(); });
+    mount.after(other);
+  }
+}
+
+/* ---------- drag meter: a chilli that heats up, a face that smiles ---------- */
+const CHILLI_COL = ['#8CCB6B', '#C9D84A', '#FFB020', '#FF6B3D', '#E01E37'];
+const BIGCHILLI = `<svg class="bigchilli" viewBox="0 0 100 100"><g class="c-steam" opacity="0"><path d="M66 22 q-6 -7 0 -14 M78 30 q-6 -7 0 -14 M54 18 q-6 -7 0 -14" fill="none" stroke="${INK}" stroke-width="3" stroke-linecap="round"/></g>
+  <g class="c-g"><path class="c-body" d="M32 32 C26 58 42 82 78 90 C86 91 86 86 80 84 C60 74 54 54 56 32 Z" fill="#E8E1DA" stroke="${INK}" stroke-width="3.5" stroke-linejoin="round"/>
+  <path d="M28 33 Q42 24 58 33 Q42 39 28 33 Z" fill="#4E8A34" stroke="${INK}" stroke-width="3" stroke-linejoin="round"/>
+  <path d="M42 29 Q41 17 51 13" fill="none" stroke="#4E8A34" stroke-width="5" stroke-linecap="round"/>
+  <path d="M38 44 Q40 60 52 70" fill="none" stroke="#fff" stroke-width="4" stroke-linecap="round" opacity=".55"/></g></svg>`;
+const FACE = `<svg class="face" viewBox="0 0 100 100"><circle cx="50" cy="50" r="40" fill="#FFD95A" stroke="${INK}" stroke-width="3.5"/>
+  <circle class="f-cheek" cx="27" cy="60" r="7" fill="#FF9EBB" opacity="0"/><circle class="f-cheek" cx="73" cy="60" r="7" fill="#FF9EBB" opacity="0"/>
+  <path class="f-brow l" d="M28 34 L40 34" fill="none" stroke="${INK}" stroke-width="3.5" stroke-linecap="round"/>
+  <path class="f-brow r" d="M72 34 L60 34" fill="none" stroke="${INK}" stroke-width="3.5" stroke-linecap="round"/>
+  <circle cx="36" cy="46" r="4.5" fill="${INK}"/><circle cx="64" cy="46" r="4.5" fill="${INK}"/>
+  <path class="f-mouth" d="M36 68 L64 68" fill="none" stroke="${INK}" stroke-width="4" stroke-linecap="round"/>
+  <path class="f-tear" d="M30 54 q-5 9 0 11 q5 -2 0 -11 Z" fill="#7CC4F5" stroke="${INK}" stroke-width="1.5" opacity="0"/></svg>`;
+const BROWS = [[38, 31], [36, 32.5], [34, 34], [32, 32], [30, 30]];
+
+function meter(spec, mount, labelId, onSet) {
+  mount.classList.add('meter');
+  const face = spec.icon === 'face';
+  mount.innerHTML = `
+    <div class="m-pic" aria-hidden="true">${face ? FACE : BIGCHILLI}</div>
+    <p class="m-word" aria-hidden="true"></p>
+    <div class="m-track" role="slider" tabindex="0" aria-labelledby="${labelId}" aria-valuemin="1" aria-valuemax="5">
+      <div class="m-rail"><i class="m-fill"></i></div><span class="m-thumb"></span>
+      <div class="m-stops">${spec.labels.map((l, k) => `<span class="m-stop" data-v="${k + 1}"><i></i>${esc(l)}</span>`).join('')}</div>
+    </div>`;
+  const track = mount.querySelector('.m-track'), word = mount.querySelector('.m-word'), thumb = mount.querySelector('.m-thumb'), fill = mount.querySelector('.m-fill');
+  let cur = S.answers[spec.id] != null ? S.answers[spec.id] : null;
+  const paint = v => {
+    mount.classList.toggle('has', v != null);
+    const p = v == null ? 3 : v;
+    thumb.style.left = (10 + (p - 1) * 20) + '%';
+    fill.style.width = v == null ? '0%' : ((v - 1) * 25) + '%';
+    word.textContent = v == null ? (face ? 'Drag me' : 'Drag the chilli') : spec.labels[v - 1];
+    mount.querySelectorAll('.m-stop').forEach(s => s.classList.toggle('on', v != null && +s.dataset.v === v));
+    track.setAttribute('aria-valuenow', v == null ? '' : v);
+    track.setAttribute('aria-valuetext', v == null ? 'Not answered' : spec.labels[v - 1]);
+    if (face) {
+      const k = v == null ? 3 : v, my = 68, c = my + (k - 3) * 7;
+      mount.querySelector('.f-mouth').setAttribute('d', `M34 ${my} Q50 ${c} 66 ${my}`);
+      const b = BROWS[k - 1];
+      mount.querySelector('.f-brow.l').setAttribute('d', `M28 ${b[0]} L40 ${b[1]}`);
+      mount.querySelector('.f-brow.r').setAttribute('d', `M72 ${b[0]} L60 ${b[1]}`);
+      mount.querySelectorAll('.f-cheek').forEach(ch => ch.setAttribute('opacity', k >= 4 ? '.8' : '0'));
+      mount.querySelector('.f-tear').setAttribute('opacity', k === 1 ? '1' : '0');
+    } else {
+      const svg = mount.querySelector('.bigchilli');
+      mount.querySelector('.c-body').setAttribute('fill', v == null ? '#E8E1DA' : CHILLI_COL[v - 1]);
+      mount.querySelector('.c-g').style.transform = `scale(${v == null ? 0.8 : 0.72 + v * 0.07}) rotate(${v == null ? 0 : (v - 3) * 4}deg)`;
+      mount.querySelector('.c-steam').setAttribute('opacity', v >= 4 ? '1' : '0');
+      svg.classList.toggle('hot', v === 5 && !reduce);
+    }
+  };
+  const vAt = x => { const r = track.getBoundingClientRect(); return Math.min(5, Math.max(1, Math.round(((x - r.left) / r.width - 0.1) / 0.2) + 1)); };
+  const set = (v, e) => { const changed = v !== cur; cur = v; S.answers[spec.id] = v; paint(v); if (changed) burst(e, thumb, 8); reactNow(); onSet(v); };
+  let drag = false;
+  track.addEventListener('pointerdown', e => { if (busy) return; drag = true; try { track.setPointerCapture(e.pointerId); } catch (err) { /* ignore */ } mount.classList.add('dragging'); paint(vAt(e.clientX)); });
+  track.addEventListener('pointermove', e => { if (drag) paint(vAt(e.clientX)); });
+  track.addEventListener('pointerup', e => { if (!drag) return; drag = false; mount.classList.remove('dragging'); set(vAt(e.clientX), e); });
+  track.addEventListener('pointercancel', () => { drag = false; mount.classList.remove('dragging'); paint(cur); });
+  track.addEventListener('keydown', e => {
+    let v = null;
+    if (e.key === 'ArrowRight' || e.key === 'ArrowUp') v = Math.min(5, (cur || 2) + 1);
+    else if (e.key === 'ArrowLeft' || e.key === 'ArrowDown') v = Math.max(1, (cur || 4) - 1);
+    else if (/^[1-5]$/.test(e.key)) v = +e.key;
+    if (v != null) { e.preventDefault(); e.stopPropagation(); set(v, null); }
+  });
+  paint(cur);
+}
+
+function fillSingle(q, box) {
+  choices(q, box, q.layout, false, 'qtext', () => { busy = true; setTimeout(advance, reduce ? 120 : 430); });
+}
+function fillMulti(q, box, el, isLast) {
+  let next;
+  choices(q, box, q.layout, true, 'qtext', () => { next.disabled = !answered(q); });
+  next = actions(el, isLast ? 'Finish' : 'Next →', () => { if (answered(q)) advance(); });
+  next.disabled = !answered(q);
+}
+function fillScale(q, box, el, isLast) {
+  let next;
+  meter(q, box, 'qtext', () => { next.disabled = false; });
+  next = actions(el, isLast ? 'Finish' : 'Next →', () => { if (answered(q)) advance(); });
+  next.disabled = !answered(q);
+}
+
+const CHILLI = `<svg class="ico chilli" viewBox="0 0 40 40" aria-hidden="true"><path class="body" d="M13 13 C11 24 17 33 31 36 C34 36.5 34 34.5 32 33.5 C24 29 21 21 22 13 Z" stroke="${INK}" stroke-width="2" stroke-linejoin="round"/><path d="M11.5 13.5 Q17 9 23.5 13.5 Q17 16 11.5 13.5 Z" fill="#4E8A34" stroke="${INK}" stroke-width="1.8" stroke-linejoin="round"/><path d="M17.5 11.5 Q17 6 21 4" fill="none" stroke="#4E8A34" stroke-width="2.6" stroke-linecap="round"/></svg>`;
+function fillRapid(q, box) {
+  box.className = 'answers rapid';
+  const vals = S.answers[q.id] || (S.answers[q.id] = q.rows.map(() => null));
+  box.innerHTML = `
+    <div class="deck"><div class="dk d3"></div><div class="dk d2"></div><div class="dk d1"><span class="dnum"></span><p class="ditem" id="ritem" aria-live="polite"></p></div></div>
+    <div class="scale" role="radiogroup" aria-labelledby="ritem">${[1, 2, 3, 4, 5].map(v => `<button type="button" class="pip" data-v="${v}" role="radio" aria-checked="false" aria-label="${v} of 5: ${q.labels[v - 1]}">${CHILLI}<span class="pl">${q.labels[v - 1]}</span></button>`).join('')}</div>`;
+  const front = box.querySelector('.d1');
+  const light = v => box.querySelectorAll('.pip').forEach(p => {
+    const n = +p.dataset.v;
+    p.classList.toggle('lit', v != null && n <= v);
+    p.classList.toggle('on', n === v);
+    p.setAttribute('aria-checked', n === v ? 'true' : 'false');
+  });
+  const update = anim => {
+    const k = S.sub, leftCards = q.rows.length - 1 - k;
+    box.querySelector('.dnum').textContent = `Card ${k + 1} of ${q.rows.length}`;
+    box.querySelector('#ritem').textContent = q.rows[k];
+    box.querySelector('.d2').style.opacity = leftCards >= 1 ? '1' : '0';
+    box.querySelector('.d3').style.opacity = leftCards >= 2 ? '1' : '0';
+    front.className = 'dk d1';
+    if (anim && !reduce) { void front.offsetWidth; front.classList.add('deal'); }
+    light(vals[k]);
+  };
+  box._update = update;
+  update(false);
+  box.querySelectorAll('.pip').forEach(p => p.addEventListener('click', e => {
+    if (busy) return;
+    busy = true;
+    const v = +p.dataset.v;
+    vals[S.sub] = v;
+    light(v);
+    burst(e, p, 8);
+    if (!reduce) front.classList.add(v <= 2 ? 'fly-l' : v >= 4 ? 'fly-r' : 'fly-u');
+    setTimeout(() => {
+      busy = false;
+      if (S.sub < q.rows.length - 1) { S.sub++; update(true); } else advance();
+    }, reduce ? 150 : 400);
+  }));
+}
+
+function fillLong(q, box, el, isLast) {
+  const f = document.createElement('textarea');
+  f.className = 'field';
+  f.id = 'f-' + q.id;
+  f.placeholder = q.placeholder || '';
+  f.setAttribute('aria-labelledby', 'qtext');
+  f.value = S.answers[q.id] || '';
+  box.appendChild(f);
+  const ok = () => f.value.trim().length >= 3;
+  const next = actions(el, isLast ? 'Finish' : 'Next →', () => { if (ok()) advance(); });
+  const sync = () => { S.answers[q.id] = f.value.trim(); next.disabled = !ok(); };
+  f.addEventListener('input', sync);
+  sync();
+}
+
+function fillGroup(q, box, el, isLast) {
+  box.className = 'answers parts';
+  let next;
+  const sync = () => {
+    if (next) next.disabled = !groupOk(q);
+    q.parts.forEach(p => { const w = box.querySelector(`[data-part="${p.id}"]`); if (w) w.classList.toggle('done', answered(p)); });
+  };
+  q.parts.forEach((p, k) => {
+    const w = document.createElement('div');
+    w.className = 'part';
+    w.dataset.part = p.id;
+    w.innerHTML = `<p class="plabel" id="pl-${p.id}">${esc(p.label)}${p.optional ? ' <small>(optional)</small>' : ''}${p.type === 'multi' ? ' <small>Pick all that apply.</small>' : ''}<span class="tick" aria-hidden="true">✓</span></p><div class="pbody"></div>`;
+    box.appendChild(w);
+    const body = w.querySelector('.pbody');
+    const after = () => {
+      sync();
+      if (p.type === 'multi') return;
+      const nxt = q.parts.slice(k + 1).find(x => !answered(x));
+      if (!nxt) return;
+      const t = box.querySelector(`[data-part="${nxt.id}"]`);
+      setTimeout(() => {
+        const top = t.getBoundingClientRect().top - card.getBoundingClientRect().top + card.scrollTop;
+        if (top + 60 > card.scrollTop + card.clientHeight) card.scrollTo({ top: top - 14, behavior: reduce ? 'auto' : 'smooth' });
+      }, 250);
+    };
+    if (p.type === 'single' || p.type === 'multi') choices(p, body, 'chips', p.type === 'multi', 'pl-' + p.id, after);
+    else if (p.type === 'scale') meter(p, body, 'pl-' + p.id, after);
+    else if (p.type === 'text') {
+      const f = document.createElement('input');
+      f.className = 'field';
+      f.id = 'f-' + p.id;
+      f.placeholder = p.placeholder || '';
+      f.setAttribute('aria-labelledby', 'pl-' + p.id);
+      f.autocomplete = 'address-level2';
+      f.value = S.answers[p.id] || '';
+      f.addEventListener('input', () => { S.answers[p.id] = f.value.trim(); sync(); reactNow(); });
+      body.appendChild(f);
+    }
+  });
+  next = actions(el, isLast ? 'Finish' : 'Next →', () => { if (groupOk(q)) advance(); });
+  sync();
+}
+
+function fillCall(q, box, el) {
+  const pick = document.createElement('div');
+  box.appendChild(pick);
+  const form = document.createElement('div');
+  form.innerHTML = `
+    <label class="flabel" for="f-name">Your name</label><input class="field" id="f-name" autocomplete="name">
+    <label class="flabel" for="f-contact">Phone number or email</label><input class="field" id="f-contact" autocomplete="off">`;
+  box.appendChild(form);
+  const n = form.querySelector('#f-name'), c = form.querySelector('#f-contact');
+  n.value = S.answers.callName || '';
+  c.value = S.answers.callContact || '';
+  n.addEventListener('input', () => { S.answers.callName = n.value.trim(); });
+  c.addEventListener('input', () => { S.answers.callContact = c.value.trim(); });
+  const yes = () => /^Yes/.test(S.answers[q.id] || '');
+  let next;
+  const sync = () => {
+    const show = yes();
+    if (show && form.hidden) { form.hidden = false; form.classList.remove('reveal'); void form.offsetWidth; form.classList.add('reveal'); }
+    form.hidden = !show;
+    if (next) next.disabled = !answered(q);
+  };
+  choices(q, pick, 'grid', false, 'qtext', sync);
+  next = actions(el, 'Finish', () => { if (answered(q)) advance(); });
+  form.hidden = !yes();
+  sync();
+}
+
+/* ================= endings ================= */
+function payload() {
+  const a = S.answers;
+  const p = { 'Status': 'Completed', 'Minutes taken': +((Date.now() - S.t0) / 60000).toFixed(1) };
+  const put = (spec, shown) => {
+    let v = shown ? a[spec.id] : undefined;
+    if (Array.isArray(v)) v = v.map(o => (o === 'Other' && a[spec.id + '_other'] ? `Other (${a[spec.id + '_other']})` : o)).join('; ');
+    p[spec.key] = v == null ? '' : v;
+  };
+  Q.forEach(q => {
+    const shown = visible(q);
+    if (q.type === 'group') q.parts.forEach(pt => put(pt, shown));
+    else if (q.type === 'rapid') q.rows.forEach((r, k) => { p[`Q23${'abcdefg'[k]} ${r} (1 very easy, 5 very difficult)`] = shown && a[q.id] && a[q.id][k] != null ? a[q.id][k] : ''; });
+    else if (q.type === 'call') {
+      put(q, shown);
+      const yes = shown && /^Yes/.test(a[q.id] || '');
+      p['Q25 Name'] = yes ? a.callName || '' : '';
+      p['Q25 Phone or email'] = yes ? a.callContact || '' : '';
+    } else put(q, shown);
+  });
+  return p;
+}
+
+async function submit() {
+  if (!LIVE || sent || sending) return;
+  sending = true;
+  setStatus('sending');
+  try {
+    const p = payload();
+    const res = await fetch(SUPABASE_URL + '/rest/v1/responses', {
+      method: 'POST',
+      headers: { 'apikey': SUPABASE_KEY, 'Content-Type': 'application/json', 'Prefer': 'return=minimal' },
+      body: JSON.stringify({ status: p['Status'], minutes_taken: p['Minutes taken'], answers: p })
+    });
+    if (!res.ok) throw new Error('Save failed: ' + res.status);
+    sent = true;
+    setStatus('sent');
+  } catch (err) {
+    setStatus('error');
+  } finally {
+    sending = false;
+  }
+}
+function setStatus(kind) {
+  const el = $('#sendStatus');
+  if (!el) return;
+  el.className = 'status' + (kind === 'sent' ? ' ok' : kind === 'error' ? ' err' : '');
+  if (kind === 'sending') el.textContent = 'Saving your answers…';
+  if (kind === 'sent') el.textContent = 'Your answers are saved ✓';
+  if (kind === 'preview') el.textContent = 'This is a preview copy, so your answers were not saved anywhere.';
+  if (kind === 'error') {
+    el.innerHTML = 'Your answers could not be saved. Check your internet connection and try again. <button class="next" type="button" id="retryBtn">Try again</button>';
+    el.querySelector('#retryBtn').addEventListener('click', submit);
+  }
+}
+
+function finish() {
+  S.mode = 'end';
+  app.dataset.mode = 'end';
+  curCh = -2;
+  setBg(END_BG);
+  showScene(sceneThanks);
+  fallEl.classList.add('on');
+  swapCard(buildEnd, 1);
+  setTimeout(() => burst(null, sceneEl, 24), 500);
+}
+function buildEnd() {
+  const el = document.createElement('div');
+  el.innerHTML = `
+    <p class="eyebrow">All done</p>
+    <h2 class="q" tabindex="-1">Thank you for sharing your story!</h2>
+    <p class="body">Your answers will help us understand the real problems families face while planning a wedding.</p>
+    <p class="status" id="sendStatus" role="status"></p>
+    ${LIVE ? `<p class="body small">Know someone who got married recently, or is getting married soon? Please send this to them.</p>
+      <div class="actions"><button class="next" id="copyBtn" type="button">Copy survey link</button></div>
+      <input class="field" id="linkField" readonly hidden aria-label="Survey link">`
+    : `<details class="mine"><summary>See my answers</summary><dl id="mine"></dl></details>
+      <div class="actions"><button class="skip" id="againBtn" type="button">Start again</button></div>`}`;
+  if (LIVE) {
+    el.querySelector('#copyBtn').addEventListener('click', e => copyLink(e.currentTarget, el));
+    setTimeout(submit, 0);
+  } else {
+    el.querySelector('#mine').innerHTML = Object.entries(payload()).filter(([k, v]) => v !== '' && k !== 'Status')
+      .map(([k, v]) => `<div><dt>${esc(k)}</dt><dd>${esc(v)}</dd></div>`).join('');
+    el.querySelector('#againBtn').addEventListener('click', showStart);
+    setTimeout(() => setStatus('preview'), 0);
+  }
+  return el;
+}
+function copyLink(btn, el) {
+  const url = location.href.split('#')[0];
+  const done = () => { btn.textContent = 'Link copied ✓'; setTimeout(() => { btn.textContent = 'Copy survey link'; }, 1800); };
+  const fallback = () => { const f = el.querySelector('#linkField'); f.value = url; f.hidden = false; f.select(); };
+  try { navigator.clipboard.writeText(url).then(done, fallback); } catch (err) { fallback(); }
+}
+function screenOut() {
+  S.mode = 'out';
+  app.dataset.mode = 'out';
+  swapCard(() => {
+    const el = document.createElement('div');
+    el.innerHTML = `
+      <p class="kicker">No problem at all.</p>
+      <h2 class="q" tabindex="-1">Thanks for stopping by!</h2>
+      <p class="body">This survey is only for people who got married in the last three years or are getting married in the next few months.</p>
+      <p class="body small">Know someone who fits? Please send this to them.</p>
+      <div class="actions">${LIVE ? '<button class="next" id="copyBtn" type="button">Copy survey link</button>' : ''}<button class="skip" id="oops" type="button">I picked the wrong option</button></div>
+      <input class="field" id="linkField" readonly hidden aria-label="Survey link">`;
+    el.querySelector('#oops').addEventListener('click', back);
+    if (LIVE) el.querySelector('#copyBtn').addEventListener('click', e => copyLink(e.currentTarget, el));
+    return el;
+  }, 1);
+}
+
+/* number keys pick an answer on one-tap screens */
+document.addEventListener('keydown', e => {
+  if (S.mode !== 'q' || e.metaKey || e.ctrlKey || e.altKey || (e.target && e.target.matches && e.target.matches('input,textarea,[role="slider"]'))) return;
+  const q = Q[S.i];
+  if (!q || !['single', 'rapid'].includes(q.type)) return;
+  const n = parseInt(e.key, 10);
+  if (!(n >= 1 && n <= 9)) return;
+  const btns = card.querySelectorAll('.cin:not(.out) .opt, .cin:not(.out) .pip');
+  if (btns[n - 1]) { e.preventDefault(); btns[n - 1].click(); }
+});
+
+/* ================= boot ================= */
+const hot = window.claude && window.claude.hot;
+if (hot && hot.snapshot) { try { hot.snapshot(() => ({ S: JSON.parse(JSON.stringify(S)) })); } catch (err) { /* optional */ } }
+function boot(data) {
+  const s = data && data.S;
+  if (s && s.mode === 'q' && Number.isInteger(s.i) && s.i >= 0 && s.i < Q.length) { S = s; goQ(S.i, 1, true); return; }
+  showStart();
+}
+if (hot && hot.ready) hot.ready(boot); else boot((hot && hot.data) || {});
+})();
+</script>
+
+</body>
+</html>
